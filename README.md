@@ -25,11 +25,11 @@ The advent of LoRA transmission technology and the availability of ready to use 
   * 0: value is zero
   * 1: value is one
   * 2: one byte integer value
-  * 3: two bytes integer value
-  * 4: four bytes signed integer value
-  * 5: six bytes small floating point number
-  * 6: height bytes floating point number
-  * 7: reserved!
+  * 3: two bytes signed integer value
+  * 4: three bytes signed integer value
+  * 5: four bytes signed integer value
+  * 6: six bytes small floating point number
+  * 7: height bytes floating point number
   * value with the number of bytes given by the format (0 to 8 bytes)
 
 ## Radio packet representation 
