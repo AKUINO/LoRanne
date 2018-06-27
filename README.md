@@ -1,4 +1,4 @@
-# Radio Sensors for AKUINO
+# Long Range (LoRa) Radio Sensors for AKUINO
 After connecting 17 sensors to a single AKUINO, we were convinced that wireless could be very useful...
 
 The advent of LoRA transmission technology and the availability of ready to use modules like AdaFruit Feather M0 convinced us to develop this improvement.
@@ -19,7 +19,9 @@ The advent of LoRA transmission technology and the availability of ready to use 
 	  * encoded on one byte
   * "TO" (for sensors, id of central node; for central node, 255 for broadcast?)
 	  * encoded on one byte
-* Data message: sequence of key-value pairs with our proposed encoding:
+  * "ID", for a given "FROM"-"TO" combination, is a sequence ID of the message: it allows the receiver to detect it has missed messages (and take action to correct this situation if needed)
+  * "FLAGS" specifies the type of message: sensor data, actuator (register) setting, retransmission request (messages missed by receiver, the receiver signals which ID are missing)
+* Data message: a 32 bits timestamp followed by a sequence of key-value pairs with our proposed encoding:
   * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte). A key may appear in multiple key-value pairs (array of values)
   * value encoding format: 3 bits (0 to 7) in the same byte (lower bits)
   * 0: value is zero
@@ -33,8 +35,10 @@ The advent of LoRA transmission technology and the availability of ready to use 
   * value with the number of bytes given by the format (0 to 8 bytes)
 
 ## Radio packet representation 
-
+Timestamp is the number of seconds since 01/01/2018 but the lowest values (0, 1, 2, ...) indicates different statuses and conditions needed to be solved before resynchronizing the clocks or resuming transmissions.
 	0              5        7
+	+-- -- -- -- --+-- -- --+
+	|  TIMESTAMP (4 bytes)  |
 	+-- -- -- -- --+-- -- --+
 	|     FROM (1 byte)     |
 	+-- -- -- -- --+-- -- --+
@@ -61,7 +65,5 @@ We will use a serial terminal (USB) to set the configuration parameters (ANSI ch
 * Campbell SDI
 * I2C device initialization command and register read...
 A basic polling cycle (e.g. 3 minutes) has to be set. Each key can be obtained at each poll or at a configured multiple.
-
-
 
 The standard pinout of Feather M0 is: https://cdn-learn.adafruit.com/assets/assets/000/046/244/original/adafruit_products_Feather_M0_Basic_Proto_v2.2-1.png?1504885373
