@@ -12,16 +12,16 @@ The advent of LoRA transmission technology and the availability of ready to use 
   * For Adafruit Feather M0 with RFM95, construct the driver like this: RH_RF95 rf95(8, 3);
 * AdaFruit Feather M0, Arduino IDE SAMD support: https://learn.adafruit.com/adafruit-feather-m0-basic-proto/using-with-arduino-ide
   * UECIDE would be prefered if SAMD suppport / AdaFruit Feather M0 was supported
-## Transmission protocol
+## Messages
 * Encryption: http://www.airspayce.com/mikem/arduino/RadioHead/classRHEncryptedDriver.html#details
 * Header with:
   * "FROM" (for sensors, id of current node; for central node, id to distinguish the right central node)
 	  * encoded on one byte
   * "TO" (for sensors, id of central node; for central node, 255 for broadcast?)
 	  * encoded on one byte
-  * "ID", for a given "FROM"-"TO" combination, is a sequence ID of the message: it allows the receiver to detect it has missed messages (and take action to correct this situation if needed)
-  * "FLAGS" specifies the type of message: sensor data, actuator (register) setting, retransmission request (messages missed by receiver, the receiver signals which ID are missing)
-* Data message: a 32 bits timestamp followed by a sequence of key-value pairs with our proposed encoding:
+  * "ID", for a given "FROM"-"TO"-"FLAGS" combination, is a sequence ID of the message (overflow at 255): it allows the receiver to detect it has missed messages (and take action to correct this situation if needed).
+  * "FLAGS" specifies the type of message: sensors data, actuators (registers) setting, retransmission request (messages missed by receiver, the receiver signals which ID are missing)
+* Sensors Data message: a 32 bits timestamp followed by a sequence of key-value pairs with our proposed encoding:
   * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte). A key may appear in multiple key-value pairs (array of values)
   * value encoding format: 3 bits (0 to 7) in the same byte (lower bits)
   * 0: value is zero
@@ -33,9 +33,17 @@ The advent of LoRA transmission technology and the availability of ready to use 
   * 6: six bytes small floating point number
   * 7: height bytes floating point number
   * value with the number of bytes given by the format (0 to 8 bytes)
+* Actuators setting messages have the same format but registers (0-31) are independant than those for sensors.
+* Retransmission request: timestamp + pairs of bytes for each ID intervals ("begin ID"-"end ID") that needs to be (re)transmitted. Overflow may occur (increment of 255 is 0) and "end ID" can be lower than "begin ID".
+* Retransmission: message with exactly the same Header (TO, FROM, ID, FLAGS) and Payload than the one transmitted before
+
+All nodes will be responsible to keep a buffer of the last messages (254 last messages for sensors and 254 last messages for actuators) they sent.
+
+Redundancy of central module is possible: the two modules then share the same ID. A central module may not have received a package and therefore ask to retransmit a message well received by the other module: redundant transmissions are therefore discarded based on ID+timestamp.
 
 ## Radio packet representation 
 Timestamp is the number of seconds since 01/01/2018 but the lowest values (0, 1, 2, ...) indicates different statuses and conditions needed to be solved before resynchronizing the clocks or resuming transmissions.
+
 	0              5        7
 	+-- -- -- -- --+-- -- --+
 	|  TIMESTAMP (4 bytes)  |
@@ -53,7 +61,16 @@ Timestamp is the number of seconds since 01/01/2018 but the lowest values (0, 1,
 	|   KEY 5 bits | VAL.For|
 	|  VALUE (0 To 8 Bytes) |
 	+-- -- -- -- --+-- -- --+
+
 It could contain several sequences of Key, Value Format and Value depending on the number of sensors connected to the module.
+
+## Protocol
+* A remote module (sensors) is sleeping most of the time (does not listen to radio) and awakens from time to time (around 3 minutes) to collect data and send it to the central module.
+* A central module is listening all the time and sends actuators settings (or retransmission requests) only just after receiving sensors data from a remote module.
+* The sender listen to the air and wait for silence (random delay) to avoid collision (this is done by the radio chip SX127x but needs to be configured. Looking at RadioHead library source code, it can be done: https://github.com/adafruit/RadioHead/blob/master/RH_RF95.h ). This is called LBT (Listen Before Talk).
+* The message is sent using RadioHead library (encrypted but no ACK required).
+* For remote module, the sender keeps listening for eventual input messages from the destination (actuators settings, sensors data retransmission requests) during a short period of time.
+* If a remote module notices that some actuators settings are missing, it requests their retransmission.
 
 ## Configuration
 We will use a serial terminal (USB) to set the configuration parameters (ANSI character codes for colors). We have the necessary code in C++ for PIC32. The configuration will have to assign a key (0 to 31) to the physically connected ports:
@@ -66,4 +83,10 @@ We will use a serial terminal (USB) to set the configuration parameters (ANSI ch
 * I2C device initialization command and register read...
 A basic polling cycle (e.g. 3 minutes) has to be set. Each key can be obtained at each poll or at a configured multiple.
 
-The standard pinout of Feather M0 is: https://cdn-learn.adafruit.com/assets/assets/000/046/244/original/adafruit_products_Feather_M0_Basic_Proto_v2.2-1.png?1504885373
+## References
+* Detailed RadioHead interface: https://github.com/adafruit/RadioHead/blob/master/RH_RF95.h
+* The standard pinout of Feather M0 is: https://cdn-learn.adafruit.com/assets/assets/000/046/244/original/adafruit_products_Feather_M0_Basic_Proto_v2.2-1.png?1504885373
+* Similar project but for very long range: http://cpham.perso.univ-pau.fr/LORA/WAZIUP/FAQ.pdf
+  * http://cpham.perso.univ-pau.fr/LORA/WAZIUP/SUTS-demo-slides.pdf
+  
+
