@@ -1,7 +1,7 @@
 # Long Range (LoRa) Radio Sensors for AKUINO
 After connecting 17 sensors to a single AKUINO, we were convinced that wireless is very useful...
 
-With the advent of LoRA transmission technology wich ensures a really good indoor range, with the availability of ready to use modules like AdaFruit Feather M0 able to transmit data for years with simple batteries, we are convinced that a very performant solution can be created.
+With the advent of LoRA transmission technology which ensures a really good indoor range, with the availability of ready to use modules like AdaFruit Feather M0 able to transmit data for years with simple batteries, we are convinced that a very performant solution can be created.
 ## Hardware
 * AdaFruit Feather M0: https://www.adafruit.com/product/3179
 * Lithium Battery: https://shop.mchobby.be/accu-et-regulateur/746-accu-lipo-37v-4400mah-3232100007468.html
@@ -13,6 +13,27 @@ With the advent of LoRA transmission technology wich ensures a really good indoo
   * For Adafruit Feather M0 with RFM95, construct the driver like this: RH_RF95 rf95(8, 3);
 * AdaFruit Feather M0, Arduino IDE SAMD support: https://learn.adafruit.com/adafruit-feather-m0-basic-proto/using-with-arduino-ide
   * UECIDE would be prefered if SAMD suppport / AdaFruit Feather M0 was supported (not really, too bad)
+## Sensors
+Each node can receive many kind of sensors and its firmware can be adapted for each situation: the USB programming port of the node can be used to either change the firmware or to access a terminal console and change parameters.
+
+An important information is battery voltage: its value will always be read and transmitted (register 1).
+
+Above that, we will start by providing mainly a good support for 1-Wire which which will ensure auto-configuration (no connexion to the USB programming port when connected devices changes).
+
+The 1-Wire devices have a 64 bits address which can be auto-discovered by polling the bus (owdir on Linux, the equivalent will have to be programmed using libraries like https://www.pjrc.com/teensy/td_libs_OneWire.html ). The 8 first bits of this address indicates a generic device type which will have to be known by the firmware to adapt itself to the characteristics of each device type (number of values available for instance). The 8 last bits are a CRC8 checksum of the 7 previous bytes. It must be verified after each transmission (wire or radio) to ensure data integrity.
+
+List of device types: http://owfs.org/index.php?page=family-code-list
+
+The device types that we really need to support at first are:
+* 26 for the DS2438 Battery Monitor (used as an ADC for various types of sensors like RH, CO2...)
+* 28 for the DS18B20 Temperature Sensor; a library directly supporting this device seems to exist: https://github.com/milesburton/Arduino-Temperature-Control-Library This may be the best way to start supporting some sensors...
+
+A very important information, because we want to support auto-configuration, is the allocation table which maps each 1-Wire device (64 bits ID numbers) to one of the 30 available data registers (see below). In register 0, a checksum of this allocation table must be sent with each radio data packet so the central node knows if it is synchronized with the sensor node (if it has the latest version of the allocation table).
+
+Every minutes or 5 (or any delay set in configuration), the node will transmit the raw data (no scaling) read for the different sensors. The allocation table will be transmitted every hour (or delay set in configuration) or on request by the central node (after detection of a checksum mismatch with the allocation table).
+
+Ideally, the receiving side in Linux could simulate an OWFS access device to a local 1-Wire bus: our software would see radio data like a standard OWFS locally wired device. To be investigated !
+
 ## Messages
 * Encryption: http://www.airspayce.com/mikem/arduino/RadioHead/classRHEncryptedDriver.html#details
 * Header with:
