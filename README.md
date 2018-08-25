@@ -1,26 +1,27 @@
 # Long Range (LoRa) Radio Sensors for AKUINO
-After connecting 17 sensors to a single AKUINO, we were convinced that wireless could be very useful...
+After connecting 17 sensors to a single AKUINO, we were convinced that wireless is very useful...
 
-The advent of LoRA transmission technology and the availability of ready to use modules like AdaFruit Feather M0 convinced us to develop this improvement.
+With the advent of LoRA transmission technology wich ensures a really good indoor range, with the availability of ready to use modules like AdaFruit Feather M0 able to transmit data for years with simple batteries, we are convinced that a very performant solution can be created.
 ## Hardware
 * AdaFruit Feather M0: https://www.adafruit.com/product/3179
 * Lithium Battery: https://shop.mchobby.be/accu-et-regulateur/746-accu-lipo-37v-4400mah-3232100007468.html
 * Possible case (10 x 10cm, 6cm deep): http://be.farnell.com/fr-BE/fibox/pcm-95-60-g/coffret-boite-polycarbonate-gris/dp/2473443
+* 1-Wire sensors have the advantage of being self-identified, "hot-pluggable" and could be connected to one sensor node or another
 ## Software
 * RadioHead libraries: http://www.airspayce.com/mikem/arduino/RadioHead/index.html
   * for LoRa: http://www.airspayce.com/mikem/arduino/RadioHead/classRH__RF95.html
   * For Adafruit Feather M0 with RFM95, construct the driver like this: RH_RF95 rf95(8, 3);
 * AdaFruit Feather M0, Arduino IDE SAMD support: https://learn.adafruit.com/adafruit-feather-m0-basic-proto/using-with-arduino-ide
-  * UECIDE would be prefered if SAMD suppport / AdaFruit Feather M0 was supported
+  * UECIDE would be prefered if SAMD suppport / AdaFruit Feather M0 was supported (not really, too bad)
 ## Messages
 * Encryption: http://www.airspayce.com/mikem/arduino/RadioHead/classRHEncryptedDriver.html#details
 * Header with:
-  * "FROM" (for sensors, id of current node; for central node, id to distinguish the right central node)
+  * "FROM" (for sensors, the id of current node; for central node, id to distinguish the right central node)
 	  * encoded on one byte
-  * "TO" (for sensors, id of central node; for central node, 255 for broadcast?)
+  * "TO" (for sensors, id of their central node; for central node, 255 for broadcast or id of a specific node to be queried)
 	  * encoded on one byte
   * "ID", for a given "FROM"-"TO"-"FLAGS" combination, is a sequence ID of the message (overflow at 255): it allows the receiver to detect it has missed messages (and take action to correct this situation if needed).
-  * "FLAGS" specifies the type of message: sensors data, actuators (registers) setting, retransmission request (messages missed by receiver, the receiver signals which ID are missing)
+  * "FLAGS" specifies the type of message: sensors data vs actuators (registers) setting, retransmission request (messages missed by receiver, the receiver signals which ID are missing), devices table to identify connected 1-Wire devices (from sensor node to central)
 * Sensors Data message: a 32 bits timestamp followed by a sequence of key-value pairs with our proposed encoding:
   * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte). A key may appear in multiple key-value pairs (array of values)
   * value encoding format: 3 bits (0 to 7) in the same byte (lower bits)
@@ -31,7 +32,7 @@ The advent of LoRA transmission technology and the availability of ready to use 
   * 4: three bytes signed integer value
   * 5: four bytes signed integer value
   * 6: six bytes small floating point number
-  * 7: height bytes floating point number
+  * 7: height bytes floating point number OR 1-Wire address
   * value with the number of bytes given by the format (0 to 8 bytes)
 * Actuators setting messages have the same format but registers (0-31) are independant than those for sensors.
 * Retransmission request: timestamp + pairs of bytes for each ID intervals ("begin ID"-"end ID") that needs to be (re)transmitted. Overflow may occur (increment of 255 is 0) and "end ID" can be lower than "begin ID".
