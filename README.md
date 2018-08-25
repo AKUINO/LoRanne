@@ -18,11 +18,11 @@ Each node can receive many kind of sensors and its firmware can be adapted for e
 
 An important information is battery voltage: its value will always be read and transmitted (register 1).
 
-Above that, we will start by providing mainly a good support for 1-Wire which which will ensure auto-configuration (no connexion to the USB programming port when connected devices changes).
+Above that, we will start by providing mainly a good support for 1-Wire which which will ensure auto-configuration (no connexion to the USB programming port when some connected devices change).
 
-The 1-Wire devices have a 64 bits address which can be auto-discovered by polling the bus (owdir on Linux, the equivalent will have to be programmed using libraries like https://www.pjrc.com/teensy/td_libs_OneWire.html ). The 8 first bits of this address indicates a generic device type which will have to be known by the firmware to adapt itself to the characteristics of each device type (number of values available for instance). The 8 last bits are a CRC8 checksum of the 7 previous bytes. It must be verified after each transmission (wire or radio) to ensure data integrity.
+Each 1-Wire device have a unique 64 bits address which can be auto-discovered by polling the 1-Wire bus (owdir on Linux, the equivalent will have to be programmed using libraries like https://www.pjrc.com/teensy/td_libs_OneWire.html ). The 8 first bits of this address indicates a generic device type which will have to be known by the firmware to adapt itself to the characteristics of each device type (e.g. number of values, polling protocol, parasitic powering...). The 8 last bits are a CRC8 checksum of the 7 previous bytes. It must be verified after each transmission (wire or radio) to ensure data integrity.
 
-List of device types: http://owfs.org/index.php?page=family-code-list
+List of existing device types: http://owfs.org/index.php?page=family-code-list
 
 The device types that we really need to support at first are:
 * 26 for the DS2438 Battery Monitor (used as an ADC for various types of sensors like RH, CO2...)
@@ -32,7 +32,7 @@ A very important information, because we want to support auto-configuration, is 
 
 Every minutes or 5 (or any delay set in configuration), the node will transmit the raw data (no scaling) read for the different sensors. The allocation table will be transmitted every hour (or delay set in configuration) or on request by the central node (after detection of a checksum mismatch with the allocation table).
 
-Ideally, the receiving side in Linux could simulate an OWFS access device to a local 1-Wire bus: our software would see radio data like a standard OWFS locally wired device. To be investigated !
+In theory, the receiving side in Linux could simulate an OWFS 1-Wire bus access layer (owserver): application software would see radio data like a standard OWFS locally wired device. In practice, we believe that data will have to be processed by the sensor node to transmit only specific data values like "temperature" and not all registers of the device. A different abstraction is needed and the design of the allocation table will have to take this into account: discussion below...
 
 ## Messages
 * Encryption: http://www.airspayce.com/mikem/arduino/RadioHead/classRHEncryptedDriver.html#details
@@ -53,8 +53,13 @@ Ideally, the receiving side in Linux could simulate an OWFS access device to a l
   * 4: three bytes signed integer value
   * 5: four bytes signed integer value
   * 6: six bytes small floating point number
-  * 7: height bytes floating point number OR 1-Wire address
+  * 7: height bytes floating point number
   * value with the number of bytes given by the format (0 to 8 bytes)
+* 1-Wire Allocation table message (sent every hour or on request from the central node):
+  * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte) identifying a data register transmitted in data messages.
+  * allocation table field: 3 bits (0 to 7) in the same byte (lower bits)
+  * 0 to 6 : to be decided, content will have the same length than the length specified for Data messages values.
+  * 7: height bytes = 64bits 1-Wire device address
 * Actuators setting messages have the same format but registers (0-31) are independant than those for sensors.
 * Retransmission request: timestamp + pairs of bytes for each ID intervals ("begin ID"-"end ID") that needs to be (re)transmitted. Overflow may occur (increment of 255 is 0) and "end ID" can be lower than "begin ID".
 * Retransmission: message with exactly the same Header (TO, FROM, ID, FLAGS) and Payload than the one transmitted before
@@ -93,22 +98,21 @@ It could contain several sequences of Key, Value Format and Value depending on t
 * The message is sent using RadioHead library (encrypted but no ACK required).
 * For remote module, the sender keeps listening for eventual input messages from the destination (actuators settings, sensors data retransmission requests) during a short period of time.
 * If a remote module notices that some actuators settings are missing, it requests their retransmission.
+* Sensor nodes send their 1-Wire Allocation table either periodically (about an hour), either when some connection changes is detected or whenever a request for it is received from the central node
 
 ## Configuration
 We will use a serial terminal (USB) to set the configuration parameters (ANSI character codes for colors). We have the necessary code in C++ for PIC32. The configuration will have to assign a key (0 to 31) to the physically connected ports:
-* Digital inputs
-* Analog inputs (12 bits)
-* Digital outputs (PWM, pull-up, delays) to be SET (messages received)
-* 1-Wire (multiple sensors: 1-Wire addresses mapped to different keys)
-* Serial link
-* Campbell SDI
-* I2C device initialization command and register read...
-A basic polling cycle (e.g. 3 minutes) has to be set. Each key can be obtained at each poll or at a configured multiple.
+* Digital inputs: for a 1st version, we will statically map some GPIO as 0/1 ports
+* Analog inputs (12 bits): for a 1st version, we will statically map some ADC inputs including at least the battery level and 2 ADC lines
+* Digital outputs (PWM, pull-up, delays) to be SET (based on messages received from central): for a 1st version, we will statically map some PWM lines with basic local configuration attributes.
+* 1-Wire (multiple sensors: 1-Wire addresses AUTOMATICALLY mapped to different keys but a selection of registries may have to be done based on the device type)
+* Serial link (not for a 1st version except if a precise need arise)
+* Campbell SDI (not for a 1st version except if a precise need arise)
+* I2C device initialization command and register read... (not for a 1st version except if a precise need arise)
+A basic polling cycle (e.g. 3 minutes) has to be set. Each key can be obtained either at each poll or at a configured multiple.
 
 ## References
 * Detailed RadioHead interface: https://github.com/adafruit/RadioHead/blob/master/RH_RF95.h
 * The standard pinout of Feather M0 is: https://cdn-learn.adafruit.com/assets/assets/000/046/244/original/adafruit_products_Feather_M0_Basic_Proto_v2.2-1.png?1504885373
 * Similar project but for very long range: http://cpham.perso.univ-pau.fr/LORA/WAZIUP/FAQ.pdf
   * http://cpham.perso.univ-pau.fr/LORA/WAZIUP/SUTS-demo-slides.pdf
-  
-
