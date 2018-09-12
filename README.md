@@ -11,6 +11,7 @@ With the advent of LoRA transmission technology which ensures a really good indo
 * RadioHead libraries: http://www.airspayce.com/mikem/arduino/RadioHead/index.html
   * for LoRa: http://www.airspayce.com/mikem/arduino/RadioHead/classRH__RF95.html
   * For Adafruit Feather M0 with RFM95, construct the driver like this: RH_RF95 rf95(8, 3);
+* 1-Wire Slave device emulation library: https://github.com/orgua/OneWireHub (in case we want to connect to host through 1-wire)
 * AdaFruit Feather M0, Arduino IDE SAMD support: https://learn.adafruit.com/adafruit-feather-m0-basic-proto/using-with-arduino-ide
   * UECIDE would be prefered if SAMD suppport / AdaFruit Feather M0 was supported (not really, too bad)
 ## Sensors
