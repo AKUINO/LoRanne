@@ -44,6 +44,9 @@ In theory, the receiving side in Linux could simulate an OWFS 1-Wire bus access 
 	  * encoded on one byte
   * "ID", for a given "FROM"-"TO"-"FLAGS" combination, is a sequence ID of the message (overflow at 255): it allows the receiver to detect it has missed messages (and take action to correct this situation if needed).
   * "FLAGS" specifies the type of message: sensors data vs actuators (registers) setting, retransmission request (messages missed by receiver, the receiver signals which ID are missing), devices table to identify connected 1-Wire devices (from sensor node to central)
+  * Sensors Data message: we will first test CayenneLPP format which is used by LoRaWAN and already supported by existing libraries ( https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload )
+## Sensors Data Messages
+We will only use a custom format if CayenneLPP cannot be adapted.
 * Sensors Data message: a 32 bits timestamp followed by a sequence of key-value pairs with our proposed encoding:
   * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte). A key may appear in multiple key-value pairs (array of values)
   * value encoding format: 3 bits (0 to 7) in the same byte (lower bits)
@@ -70,6 +73,8 @@ All nodes will be responsible to keep a buffer of the last messages (254 last me
 Redundancy of central module is possible: the two modules then share the same ID. A central module may not have received a package and therefore ask to retransmit a message well received by the other module: redundant transmissions are therefore discarded based on ID+timestamp.
 
 ## Radio packet representation 
+This format will be used only if CayenneLPP  ( https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload ) cannot be adapted.
+
 Timestamp is the number of seconds since 01/01/2018 but the lowest values (0, 1, 2, ...) indicates different statuses and conditions needed to be solved before resynchronizing the clocks or resuming transmissions.
 
 	0              5        7
@@ -117,3 +122,4 @@ A basic polling cycle (e.g. 3 minutes) has to be set. Each key can be obtained e
 * The standard pinout of Feather M0 is: https://cdn-learn.adafruit.com/assets/assets/000/046/244/original/adafruit_products_Feather_M0_Basic_Proto_v2.2-1.png?1504885373
 * Similar project but for very long range: http://cpham.perso.univ-pau.fr/LORA/WAZIUP/FAQ.pdf
   * http://cpham.perso.univ-pau.fr/LORA/WAZIUP/SUTS-demo-slides.pdf
+* CayenneLPP: https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload
