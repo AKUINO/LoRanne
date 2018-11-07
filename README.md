@@ -14,6 +14,8 @@ With the advent of LoRA transmission technology which ensures a really good indo
 * 1-Wire Slave device emulation library: https://github.com/orgua/OneWireHub (in case we want to connect to host through 1-wire)
 * AdaFruit Feather M0, Arduino IDE SAMD support: https://learn.adafruit.com/adafruit-feather-m0-basic-proto/using-with-arduino-ide
   * UECIDE would be prefered if SAMD suppport / AdaFruit Feather M0 was supported (not really, too bad)
+## LoRa
+* Calculator of Allowed duty cycle for different LoRa configurations: https://docs.google.com/spreadsheets/d/1COg2J1at6j8meehTtvfj5TIiM8pbj4SvKf7sa-Oq5fU/edit#gid=1628588258
 ## Sensors
 Each node can receive many kind of sensors and its firmware can be adapted for each situation: the USB programming port of the node can be used to either change the firmware or to access a terminal console and change parameters.
 
