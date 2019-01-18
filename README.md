@@ -15,6 +15,8 @@ With the advent of LoRA transmission technology which ensures a really good indo
 * AdaFruit Feather M0, Arduino IDE SAMD support: https://learn.adafruit.com/adafruit-feather-m0-basic-proto/using-with-arduino-ide
   * UECIDE would be prefered if SAMD suppport / AdaFruit Feather M0 was supported (not really, too bad)
 ## LoRa
+* Allowed duty cycle and power in different 868MHz bands: https://www.disk91.com/2017/technology/internet-of-things-technology/all-what-you-need-to-know-about-regulation-on-rf-868mhz-for-lpwan/ From this document, the best local bandwidth could be 869,3 to 869,4 limited to 10mW but with no duty cycle constraint.
+* 433 MHz may not be allowed in production within Europe: the project may have to be announced as "RFID" if we stick to those frequencies.
 * Calculator of Allowed duty cycle for different LoRa configurations: https://docs.google.com/spreadsheets/d/1COg2J1at6j8meehTtvfj5TIiM8pbj4SvKf7sa-Oq5fU/edit#gid=1628588258
 ## Sensors
 Each node can receive many kind of sensors and its firmware can be adapted for each situation: the USB programming port of the node can be used to either change the firmware or to access a terminal console and change parameters.
