@@ -77,7 +77,7 @@ All nodes will be responsible to keep a buffer of the last messages (254 last me
 Redundancy of central module is possible: the two modules then share the same ID. A central module may not have received a package and therefore ask to retransmit a message well received by the other module: redundant transmissions are therefore discarded based on ID+timestamp.
 
 ## Radio packet representation 
-This format will be used only if CayenneLPP  ( https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload ) cannot be adapted.
+This format will be used only if CayenneLPP ( https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload ) or others (TLV, ASN.BER) are not adapted. Our format is more compact because of the limitation of 32 sensors per module.
 
 Timestamp is the number of seconds since 01/01/2018 but the lowest values (0, 1, 2, ...) indicates different statuses and conditions needed to be solved before resynchronizing the clocks or resuming transmissions.
 
@@ -102,6 +102,7 @@ Timestamp is the number of seconds since 01/01/2018 but the lowest values (0, 1,
 It could contain several sequences of Key, Value Format and Value depending on the number of sensors connected to the module.
 
 ## Protocol
+* A potential source of inspiration: https://github.com/fredilarsen/ModuleInterface/blob/master/documentation/Protocol.md
 * A remote module (sensors) is sleeping most of the time (does not listen to radio) and awakens from time to time (around 3 minutes) to collect data and send it to the central module.
 * A central module is listening all the time and sends actuators settings (or retransmission requests) only just after receiving sensors data from a remote module.
 * The sender listen to the air and wait for silence (random delay) to avoid collision (this is done by the radio chip SX127x but needs to be configured. Looking at RadioHead library source code, it can be done: https://github.com/adafruit/RadioHead/blob/master/RH_RF95.h ). This is called LBT (Listen Before Talk).
@@ -127,3 +128,4 @@ A basic polling cycle (e.g. 3 minutes) has to be set. Each key can be obtained e
 * Similar project but for very long range: http://cpham.perso.univ-pau.fr/LORA/WAZIUP/FAQ.pdf
   * http://cpham.perso.univ-pau.fr/LORA/WAZIUP/SUTS-demo-slides.pdf
 * CayenneLPP: https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload
+* PJON, an alternative transmission protocol: https://github.com/fredilarsen/ModuleInterface/blob/master/documentation/Protocol.md
