@@ -6,12 +6,14 @@ With the advent of LoRA transmission technology which ensures a really good indo
 * AdaFruit Feather M0: https://www.adafruit.com/product/3179
 * Lithium Battery: https://shop.mchobby.be/accu-et-regulateur/746-accu-lipo-37v-4400mah-3232100007468.html
 * Possible case (10 x 10cm, 6cm deep): http://be.farnell.com/fr-BE/fibox/pcm-95-60-g/coffret-boite-polycarbonate-gris/dp/2473443
-* 1-Wire sensors have the advantage of being self-identified, "hot-pluggable" and could be connected to one sensor node or another
+* 1-Wire sensors have the advantage of being self-identified, "hot-pluggable" and could be connected to one sensor node or another: https://www.maximintegrated.com/en/app-notes/index.mvp/id/4206
 ## Software
 * RadioHead libraries: http://www.airspayce.com/mikem/arduino/RadioHead/index.html
   * for LoRa: http://www.airspayce.com/mikem/arduino/RadioHead/classRH__RF95.html
   * For Adafruit Feather M0 with RFM95, construct the driver like this: RH_RF95 rf95(8, 3);
+* 1-wire Host driver: https://www.maximintegrated.com/en/products/ibutton/software/1wire/wirekit.cfm
 * 1-Wire Slave device emulation library: https://github.com/orgua/OneWireHub (in case we want to connect to host through 1-wire)
+
 * AdaFruit Feather M0, Arduino IDE SAMD support: https://learn.adafruit.com/adafruit-feather-m0-basic-proto/using-with-arduino-ide
   * UECIDE would be prefered if SAMD suppport / AdaFruit Feather M0 was supported (not really, too bad)
 ## LoRa
