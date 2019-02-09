@@ -7,6 +7,7 @@ With the advent of LoRA transmission technology which ensures a really good indo
 * Lithium Battery: https://shop.mchobby.be/accu-et-regulateur/746-accu-lipo-37v-4400mah-3232100007468.html
 * Possible case (10 x 10cm, 6cm deep): http://be.farnell.com/fr-BE/fibox/pcm-95-60-g/coffret-boite-polycarbonate-gris/dp/2473443
 * 1-Wire sensors have the advantage of being self-identified, "hot-pluggable" and could be connected to one sensor node or another: https://www.maximintegrated.com/en/app-notes/index.mvp/id/4206
+* Serial adapter for 1-Wire (much better reliability than bit-banging): https://www.mikroe.com/uart-1-wire-click Do not forget that 5V are required: Feather only provides 3.3V...
 ## Software
 * RadioHead libraries: http://www.airspayce.com/mikem/arduino/RadioHead/index.html
   * for LoRa: http://www.airspayce.com/mikem/arduino/RadioHead/classRH__RF95.html
