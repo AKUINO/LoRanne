@@ -11,6 +11,8 @@ With the advent of LoRA transmission technology which ensures a really good indo
 * I2C sensors are often working at 3.3V and 5V. Short wires though (20 cm max: should be in the same box than the radio module)
   * I2C CO2+temperature+humidity: https://befr.rs-online.com/web/p/products/1720552/?grossPrice=Y&cm_mmc=BE-PLA-DS3A-_-google-_-PLA_BE_NL_Semiconductors-_-Sensor_Ics|Temperature_And_Humidity_Sensors-_-PRODUCT_GROUP&matchtype=&pla-544508151584&gclid=Cj0KCQiAzKnjBRDPARIsAKxfTRA_NGOGs_dE9fBuCA61ZyCIf1GovlkXcqFPyUBE3JYgCDP7rXKEHxUaAuaREALw_wcB&gclsrc=aw.ds
   * I2C Temperature and/or humidity: https://befr.rs-online.com/web/c/semiconductors/sensor-ics/temperature-sensors-humidity-sensors/?searchTerm=i2c%20sensor&applied-dimensions=4293448979,4294510394,4294490065,4294505396,4294510395,4294510203,4294356324,4294821500 and also https://www.tindie.com/products/akdracom/temperature-humidity-sensor-probe-precision-ic/
+  * Wiring standard QWIIC from Sparkfun seems just nice: https://www.sparkfun.com/qwiic
+
 ## Software
 * RadioHead libraries: http://www.airspayce.com/mikem/arduino/RadioHead/index.html
   * for LoRa: http://www.airspayce.com/mikem/arduino/RadioHead/classRH__RF95.html
