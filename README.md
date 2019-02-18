@@ -57,7 +57,7 @@ In theory, the receiving side in Linux could simulate an OWFS 1-Wire bus access 
   * "TO" (for sensors, id of their central node; for central node, 255 for broadcast or id of a specific node to be queried)
 	  * encoded on one byte
   * "ID", for a given "FROM"-"TO"-"FLAGS" combination, is a sequence ID of the message (overflow at 255): it allows the receiver to detect it has missed messages (and take action to correct this situation if needed).
-  * "FLAGS" specifies the type of message: sensors data vs actuators (registers) setting; retransmission request (messages missed by receiver, the receiver signals which ID are missing); devices table to identify connected 1-Wire devices (from sensor node to central: ABANDONED); relaying (MESH protocol, to be designed)
+  * "FLAGS" specifies the type of message: sensors data vs actuators (registers) setting; retransmission request (messages missed by receiver, the receiver signals which ID are missing); devices table to identify connected 1-Wire or I2C devices (from sensor node to central); relaying (MESH protocol, to be designed)
   * Sensors Data message: see below
 
 ## Sensors Data Messages
@@ -85,6 +85,10 @@ The one we propose is more compact if we intend to develop our own protocol inst
   * allocation table field: 3 bits (0 to 7) in the same byte (lower bits)
   * 0 to 6 : to be decided, content will have the same length than the length specified for Data messages values.
   * 7: height bytes = 64bits 1-Wire device address
+* I2C Allocation table message (sent every hour or on request from the central node):
+  * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte) identifying a data register transmitted in data messages.
+  * allocation table field: 3 bits (0 to 7) in the same byte (lower bits)
+  * 2 to 7: (1 to height bytes) byte 0 = I2C device address; byte 1 = device sub-type; byte 3 to 6 = configuration byte 1 to 4
 * Actuators setting messages have the same format but registers (0-31) are independant than those for sensors.
 * Retransmission request: timestamp + pairs of bytes for each ID intervals ("begin ID"-"end ID") that needs to be (re)transmitted. Overflow may occur (increment of 255 is 0) and "end ID" can be lower than "begin ID".
 * Retransmission: message with exactly the same Header (TO, FROM, ID, FLAGS) and Payload than the one transmitted before
@@ -128,7 +132,7 @@ It could contain several sequences of Key, Value Format and Value depending on t
 * The message is sent using RadioHead library (encrypted but no ACK required).
 * For remote module, the sender keeps listening for eventual input messages from the destination (actuators settings, sensors data retransmission requests) during a short period of time.
 * If a remote module notices that some actuators settings are missing, it requests their retransmission.
-* ABANDONED: Sensor nodes send their 1-Wire Allocation table either periodically (about an hour), either when some connection changes is detected or whenever a request for it is received from the central node
+* Sensor nodes send their 1-Wire / I2C Allocation table either periodically (about an hour), either when some connection changes is detected or whenever a request for it is received from the central node
 
 ## Configuration
 We will use a serial terminal (USB) to set the configuration parameters (ANSI character codes for colors). We have the necessary code in C++ for PIC32. The configuration will have to assign a key (0 to 31) to the physically connected ports:
