@@ -57,10 +57,17 @@ In theory, the receiving side in Linux could simulate an OWFS 1-Wire bus access 
   * "TO" (for sensors, id of their central node; for central node, 255 for broadcast or id of a specific node to be queried)
 	  * encoded on one byte
   * "ID", for a given "FROM"-"TO"-"FLAGS" combination, is a sequence ID of the message (overflow at 255): it allows the receiver to detect it has missed messages (and take action to correct this situation if needed).
-  * "FLAGS" specifies the type of message: sensors data vs actuators (registers) setting, retransmission request (messages missed by receiver, the receiver signals which ID are missing), devices table to identify connected 1-Wire devices (from sensor node to central)
-  * Sensors Data message: CayenneLPP format which is used by LoRaWAN and already supported by existing libraries ( https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload ).Other libraries are existing for NDN TLV or ASN.1 BER.
+  * "FLAGS" specifies the type of message: sensors data vs actuators (registers) setting; retransmission request (messages missed by receiver, the receiver signals which ID are missing); devices table to identify connected 1-Wire devices (from sensor node to central: ABANDONED); relaying (MESH protocol, to be designed)
+  * Sensors Data message: see below
+
 ## Sensors Data Messages
-There are different encoding formats: CayenneLPP, TLV (Type-Length-Value), BER from ASN.1). The one we propose is more compact if we intend to develop our own protocol instead of LoRaWAN (or other IoT protocol that would be compact enough for LoRa).
+There are different encoding formats:
+* CayenneLPP format which is used by LoRaWAN and already supported by existing libraries ( https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload )
+* NDN TLV (Type-Length-Value)
+* BER from ASN.1
+* SensML: https://tools.ietf.org/html/rfc8428
+
+The one we propose is more compact if we intend to develop our own protocol instead of LoRaWAN (or other IoT protocol that would be compact enough for LoRa).
 * Sensors Data message: a 32 bits timestamp followed by a sequence of key-value pairs with our proposed encoding:
   * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte). A key may appear in multiple key-value pairs (array of values)
   * value encoding format: 3 bits (0 to 7) in the same byte (lower bits)
