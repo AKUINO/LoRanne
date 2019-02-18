@@ -7,10 +7,10 @@ With the advent of LoRA transmission technology which ensures a really good indo
 * Lithium Battery: https://shop.mchobby.be/accu-et-regulateur/746-accu-lipo-37v-4400mah-3232100007468.html
 * Possible case (10 x 10cm, 6cm deep): http://be.farnell.com/fr-BE/fibox/pcm-95-60-g/coffret-boite-polycarbonate-gris/dp/2473443
 * 1-Wire sensors have the advantage of being self-identified, "hot-pluggable" and could be connected to one sensor node or another: https://www.maximintegrated.com/en/app-notes/index.mvp/id/4206
-* Serial adapter for 1-Wire (much better reliability than bit-banging): https://www.mikroe.com/uart-1-wire-click Do not forget that 5V are required: Feather only provides 3.3V...
+  * Serial adapter for 1-Wire (much better reliability than bit-banging): https://www.mikroe.com/uart-1-wire-click Do not forget that 5V are required: Feather only provides 3.3V...
 * I2C sensors are often working at 3.3V and 5V. Short wires though (20 cm max: should be in the same box than the radio module)
-* I2C CO2+temperature+humidity: https://befr.rs-online.com/web/p/products/1720552/?grossPrice=Y&cm_mmc=BE-PLA-DS3A-_-google-_-PLA_BE_NL_Semiconductors-_-Sensor_Ics|Temperature_And_Humidity_Sensors-_-PRODUCT_GROUP&matchtype=&pla-544508151584&gclid=Cj0KCQiAzKnjBRDPARIsAKxfTRA_NGOGs_dE9fBuCA61ZyCIf1GovlkXcqFPyUBE3JYgCDP7rXKEHxUaAuaREALw_wcB&gclsrc=aw.ds
-* I2C Temperature and/or humidity: https://befr.rs-online.com/web/c/semiconductors/sensor-ics/temperature-sensors-humidity-sensors/?searchTerm=i2c%20sensor&applied-dimensions=4293448979,4294510394,4294490065,4294505396,4294510395,4294510203,4294356324,4294821500 and also https://www.tindie.com/products/akdracom/temperature-humidity-sensor-probe-precision-ic/
+  * I2C CO2+temperature+humidity: https://befr.rs-online.com/web/p/products/1720552/?grossPrice=Y&cm_mmc=BE-PLA-DS3A-_-google-_-PLA_BE_NL_Semiconductors-_-Sensor_Ics|Temperature_And_Humidity_Sensors-_-PRODUCT_GROUP&matchtype=&pla-544508151584&gclid=Cj0KCQiAzKnjBRDPARIsAKxfTRA_NGOGs_dE9fBuCA61ZyCIf1GovlkXcqFPyUBE3JYgCDP7rXKEHxUaAuaREALw_wcB&gclsrc=aw.ds
+  * I2C Temperature and/or humidity: https://befr.rs-online.com/web/c/semiconductors/sensor-ics/temperature-sensors-humidity-sensors/?searchTerm=i2c%20sensor&applied-dimensions=4293448979,4294510394,4294490065,4294505396,4294510395,4294510203,4294356324,4294821500 and also https://www.tindie.com/products/akdracom/temperature-humidity-sensor-probe-precision-ic/
 ## Software
 * RadioHead libraries: http://www.airspayce.com/mikem/arduino/RadioHead/index.html
   * for LoRa: http://www.airspayce.com/mikem/arduino/RadioHead/classRH__RF95.html
@@ -29,9 +29,13 @@ Each node can receive many kind of sensors and its firmware can be adapted for e
 
 An important information is battery voltage: its value will always be read and transmitted (register 1).
 
-Above that, we will start by providing mainly a good support for 1-Wire which which will ensure auto-configuration (no connexion to the USB programming port when some connected devices change).
+### I2C
+I2C runs on 5V but also on 3.3V (not all sensors but most). Wires must be kept very short (20cm max, less is better).
 
-Each 1-Wire device have a unique 64 bits address which can be auto-discovered by polling the 1-Wire bus (owdir on Linux, the equivalent will have to be programmed using libraries like https://www.pjrc.com/teensy/td_libs_OneWire.html ). The 8 first bits of this address indicates a generic device type which will have to be known by the firmware to adapt itself to the characteristics of each device type (e.g. number of values, polling protocol, parasitic powering...). The 8 last bits are a CRC8 checksum of the 7 previous bytes. It must be verified after each transmission (wire or radio) to ensure data integrity.
+The commands are different for each type of sensors: the bus cannot be really "auto discovered" like with 1-Wire (see below). The only possible thing is to associate I2C addresses with possible devices...
+
+### 1-Wire (abandoned for now)
+We were thinking about using 1-Wire which would ensure auto-configuration (no connexion to the USB programming port when some connected devices change). Each 1-Wire device have a unique 64 bits address which can be auto-discovered by polling the 1-Wire bus (owdir on Linux, the equivalent will have to be programmed using libraries like https://www.pjrc.com/teensy/td_libs_OneWire.html ). The 8 first bits of this address indicates a generic device type which will have to be known by the firmware to adapt itself to the characteristics of each device type (e.g. number of values, polling protocol, parasitic powering...). The 8 last bits are a CRC8 checksum of the 7 previous bytes. It must be verified after each transmission (wire or radio) to ensure data integrity.
 
 List of existing device types: http://owfs.org/index.php?page=family-code-list
 
@@ -69,7 +73,7 @@ There are different encoding formats: CayenneLPP, TLV (Type-Length-Value), BER f
   * 6: six bytes small floating point number
   * 7: height bytes floating point number
   * value with the number of bytes given by the format (0 to 8 bytes)
-* 1-Wire Allocation table message (sent every hour or on request from the central node):
+* ABANDONED: 1-Wire Allocation table message (sent every hour or on request from the central node):
   * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte) identifying a data register transmitted in data messages.
   * allocation table field: 3 bits (0 to 7) in the same byte (lower bits)
   * 0 to 6 : to be decided, content will have the same length than the length specified for Data messages values.
@@ -84,6 +88,8 @@ Redundancy of central module is possible: the two modules then share the same ID
 
 ## Radio packet representation 
 This format will be used only if CayenneLPP ( https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload ) or others (TLV, ASN.BER) are not adapted. Our format is more compact because of the limitation of 32 sensors per module.
+
+Another interesting format is SensML: https://tools.ietf.org/html/rfc8428
 
 Timestamp is the number of seconds since 01/01/2018 but the lowest values (0, 1, 2, ...) indicates different statuses and conditions needed to be solved before resynchronizing the clocks or resuming transmissions.
 
@@ -115,17 +121,17 @@ It could contain several sequences of Key, Value Format and Value depending on t
 * The message is sent using RadioHead library (encrypted but no ACK required).
 * For remote module, the sender keeps listening for eventual input messages from the destination (actuators settings, sensors data retransmission requests) during a short period of time.
 * If a remote module notices that some actuators settings are missing, it requests their retransmission.
-* Sensor nodes send their 1-Wire Allocation table either periodically (about an hour), either when some connection changes is detected or whenever a request for it is received from the central node
+* ABANDONED: Sensor nodes send their 1-Wire Allocation table either periodically (about an hour), either when some connection changes is detected or whenever a request for it is received from the central node
 
 ## Configuration
 We will use a serial terminal (USB) to set the configuration parameters (ANSI character codes for colors). We have the necessary code in C++ for PIC32. The configuration will have to assign a key (0 to 31) to the physically connected ports:
 * Digital inputs: for a 1st version, we will statically map some GPIO as 0/1 ports
 * Analog inputs (12 bits): for a 1st version, we will statically map some ADC inputs including at least the battery level and 2 ADC lines
 * Digital outputs (PWM, pull-up, delays) to be SET (based on messages received from central): for a 1st version, we will statically map some PWM lines with basic local configuration attributes.
-* 1-Wire (multiple sensors: 1-Wire addresses AUTOMATICALLY mapped to different keys but a selection of registries may have to be done based on the device type)
+* ABANDONED: 1-Wire (multiple sensors: 1-Wire addresses AUTOMATICALLY mapped to different keys but a selection of registries may have to be done based on the device type. ABANDONED for now due to lack of 5V...)
 * Serial link (not for a 1st version except if a precise need arise)
 * Campbell SDI (not for a 1st version except if a precise need arise)
-* I2C device initialization command and register read... (not for a 1st version except if a precise need arise)
+* I2C device initialization command and register read: this is not well standardized but we will try to orthogonalize the possibilities.
 A basic polling cycle (e.g. 3 minutes) has to be set. Each key can be obtained either at each poll or at a configured multiple.
 
 ## References
