@@ -23,23 +23,30 @@ Il est en français car il est à usage de l'équipe aux commandes à Gembloux e
 ## Spécifications du logiciel
 
 1. Voir le README.md ...
-1. On préallouera les registres de configuration et de réception des données (pas de nécessité de gérer une allocation dynamique pour le moment)
+1. On préallouera les registres de configuration et de réception des données (pas de nécessité de gérer une allocation dynamique pour le moment): voir plus loin
 1. Réseau en étoile (pas de relais "MESH") avec un "data sink" Central (connexion à Internet) pour le moment
+1. Bande 10mW (pas de limite d'utilisation)
+1. Sortie du Central par le port USB (Série), une ligne par paquet reçu avec encodage "URL": ...?clé=valeur&clé=valeur...
+1. Commandes de paramétrage aussi sous forme d'URL: ...?clé=valeur&clé=valeur&...&clé=valeur
 
 ## Tableau des Périphériques ("output" du module)
 
 On tient compte du "pinout": https://cdn-learn.adafruit.com/assets/assets/000/046/254/original/feather_Feather_M0_LoRa_v1.2-1.png?1504886587
 
-* 4 octets: "timestamp" d'envoi: Horloge synchronisée par les messages du Central (data sink)
-* Registre 1, 2 octets: Voltage en mV: Niveau de la batterie
-* Registre 2, 1 octet: RSSI de réception des messages envoyés par le Central (data sink)
-* Registre 3, un ou plusieurs blocs de 1 à 8 octets: données du Port Série (RS232); broches marquées "RX" et "TX"
+* TIME, 4 octets: "timestamp" d'envoi: Horloge synchronisée par les messages du Central (data sink)
+* BATT, Registre 1, 2 octets: Voltage en mV: Niveau de la batterie
+* RSSI, Registre 2, 1 octet: RSSI de réception des messages envoyés par le Central (data sink)
+* RX, Registre 3, un ou plusieurs blocs de 1 à 8 octets: données du Port Série (RS232); broches marquées "RX" et "TX"
 * I2C: broches marquées "SDA" et "SCL"
-  * Registre 4, 2 octets: I2C Température en °C x 100
-  * Registre 5, 2 octets: I2C Humidité en %rH (% x 100)
-  * Registre 6, 2 octets: I2C Luminosité (0 à 1000 environ)
+  * TEMP, Registre 4, 2 octets: I2C Température en °C x 100
+  * RH, Registre 5, 2 octets: I2C Humidité en %rH (% x 100)
+  * LUM, Registre 6, 2 octets: I2C Luminosité (0 à 1000 environ)
   * Registre 7 à 11: I2C expansion...
-* Registre 12 à 17, 2 octets: ADC, broches marquées "A0" à "A5"
-* Registre 18 à 23, 0/1: GPIO, broches marquées "9" à "13"
+* ADC0 à ADC5, Registre 12 à 17, 2 octets: ADC, broches marquées "A0" à "A5"
+* IO09 à IO13, Registre 18 à 23, 0/1: GPIO, broches marquées "9" à "13"
 * Broches marquées "5" et "6": contrôle du VCC pour les périphériques, contrôle de flux pour le RS232?
 * Autres ?
+
+## Tableau de configuration des Périphériques (paramétrage du module)
+
+On utilisera les mêmes numéros de registres que pour la sortie et les mêmes identifiants dans l'URL d'entrée sauf pour RX qui devient TX...
