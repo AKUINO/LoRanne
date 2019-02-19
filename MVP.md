@@ -50,3 +50,9 @@ On tient compte du "pinout": https://cdn-learn.adafruit.com/assets/assets/000/04
 ## Tableau de configuration des Périphériques (paramétrage du module)
 
 On utilisera les mêmes numéros de registres que pour la sortie et les mêmes identifiants dans l'URL d'entrée sauf pour RX qui devient TX...
+
+## Connecter un périphérique RS232 à ELSA
+
+On peut connecter tout périphérique série à une tablette et envoyer des données au clavier de la tablette. Ces données peuvent commencer par un caractère "accent grave" pour que ELSA le reconnaisse comme début d'une opération spéciale (par exemple stocker la donnée transmise). Ceci pourra servir aux balances, aux lecteurs de pH, etc.
+
+On utiliserait un "BlueFruit" avec un sketch implantant un Bluetooth HID: https://learn.adafruit.com/introducing-the-adafruit-bluefruit-spi-breakout/hidkeyboard . On pourrait aussi connecter tout type de capteur I2C ou autre avec tout type de smartphone ou de tablette.
