@@ -51,8 +51,54 @@ On tient compte du "pinout": https://cdn-learn.adafruit.com/assets/assets/000/04
 
 On utilisera les mêmes numéros de registres que pour la sortie et les mêmes identifiants dans l'URL d'entrée sauf pour RX qui devient TX...
 
-## Connecter un périphérique RS232 à ELSA
+# Connexion du récepteur central à Internet
 
-On peut connecter tout périphérique série à une tablette et envoyer des données au clavier de la tablette. Ces données peuvent commencer par un caractère "accent grave" pour que ELSA le reconnaisse comme début d'une opération spéciale (par exemple stocker la donnée transmise). Ceci pourra servir aux balances, aux lecteurs de pH, etc.
+Ce module peut soit collecter les données provenant de sondes LoRa mais en plus des données provenant de capteurs locaux.
 
-On utiliserait un "BlueFruit" avec un sketch implantant un Bluetooth HID: https://learn.adafruit.com/adafruit-feather-m0-bluefruit-le/hidkeyboard . On pourrait aussi connecter tout type de capteur I2C ou autre avec tout type de smartphone ou de tablette.
+1. Module AdaFruit Feather M0 LoRa 868 MHz
+1. Module AdaFruit FeatherWing Ethernet (connexion Internet par fil allant au routeur): https://www.adafruit.com/product/3201
+1. Batterie LiPo comme alimentation de secours en cas de panne de courant
+1. Boîtier (protection de niveau "domestique") laissant passer les fils ou capteurs requis
+1. Connexions:
+   1. Antenne interne ou externe ? Tester la différence de portée...
+   1. Port Ethernet (cable UTP de 1 mètre jusqu'au routeur)
+   1. Port USB "device" du AdaFruit Feather: alimenter le module, pouvoir charger la batterie, pouvoir mettre à jour le logiciel, pouvoir configurer sans ouvrir le boîtier. Se connecte au port USB du routeur interne (cable USB de 1 mètre jusqu'au routeur ou 3 mètres si jusqu'à un chargeur mural)
+   1. Périphériques I2C en chaîne (connecteurs Grove: 4=GND - 3=3V3 - 2=SDA - 1=SCL) de 20cm ou moins.
+   1. Port RS-232 (balance, sonde pH, etc.) avec convertisseur de niveaux du genre MAX3232. Idéalement le signal DCE (ou autre?) devrait être lié à un GPIO indiquant si le micro-contrôleur est endormi ou non.
+   1. (combien?) Ports GPIO en entrée ou en sortie (bornier à vis), protections sans doute nécessaire (décharges électrostatiques, surtensions, court-circuit...)
+   1. (combien?) Ports ADC en entrée (bornier à vis), protections sans doute nécessaire (décharges électrostatiques, surtensions...)
+   1. Plusieurs points de connexions devraient être prévus pour la terre (GND) et le VCC (ou le VCC commuté) afin de pouvoir assembler des composants discrets (résistances) pour protéger les entrées.
+   1. Bouton "reset" ou ON/OFF pour redémarrer sans devoir ouvrir (panne) ? S'inspirer de https://cdn-learn.adafruit.com/downloads/pdf/on-slash-off-switches.pdf?timestamp=1550577849
+
+# Connecter un périphérique RS232 à une application existante sur tablette (ou smartphone)
+
+On veut connecter tout périphérique série à une tablette et envoyer des données au clavier de la tablette (ou smartphone. Ces données peuvent commencer par un caractère "accent grave" pour que ELSA le reconnaisse comme début d'une opération spéciale (par exemple stocker la donnée transmise). Ceci pourra servir aux balances, aux lecteurs de pH, etc.
+
+On utiliserait le même matériel que pour une sonde radio mais en remplaçant le module Adafruit par un "BlueFruit": https://www.adafruit.com/product/3406 .
+
+Au niveau logiciel il faut alors un sketch implantant un Bluetooth HID: https://learn.adafruit.com/adafruit-feather-m0-bluefruit-le/hidkeyboard .
+
+On pourrait de plus connecter tout type de capteur I2C (ou autre) avec tout type de smartphone ou de tablette.
+
+# Connecter toute une série de capteurs à Internet (WiFi ou Ethernet):
+
+Ce module peut envoyer les données collectées par WiFi ou par Ethernet.
+
+1. Module AdaFruit Feather M0 Wifi: https://learn.adafruit.com/adafruit-feather-m0-wifi-atwinc1500
+1. Option: Module AdaFruit FeatherWing Ethernet (connexion Internet par fil allant au routeur): https://www.adafruit.com/product/3201
+1. Batterie LiPo comme alimentation de secours en cas de panne de courant
+1. Boîtier pour coffret électrique (rail DIN)
+1. Coffret électrique ABB Mistral (IP65) de taille adéquate
+1. Serres étoupes (passe-cable) amovibles selon les besoins
+1. Périphériques I2C avec entrées/sorties protégées et support pour rail DIN: https://www.ereshop.com/shop/index.php?main_page=index&cPath=143
+1. Alimentation électrique 5.2V: https://www.conrad.fr/p/alimentation-rail-din-tracopower-tbl-015-105-52-vdc-24-a-12-w-1-x-511941
+1. Connexions:
+   1. Antenne interne ou externe ? Tester la différence de portée...
+   1. Port Ethernet (cable UTP de 1 mètre jusqu'au routeur)
+   1. Port USB "device" du AdaFruit Feather: alimenter le module, pouvoir charger la batterie, pouvoir mettre à jour le logiciel, pouvoir configurer sans ouvrir le boîtier. Se connecte au port USB du routeur interne (cable USB de 1 mètre jusqu'au routeur ou 3 mètres si jusqu'à un chargeur mural)
+   1. Périphériques I2C en chaîne (connecteurs Grove: 4=GND - 3=3V3 - 2=SDA - 1=SCL) de 20cm ou moins.
+   1. Port RS-232 (balance, sonde pH, etc.) avec convertisseur de niveaux du genre MAX3232. Idéalement le signal DCE (ou autre?) devrait être lié à un GPIO indiquant si le micro-contrôleur est endormi ou non.
+   1. (combien?) Ports GPIO en entrée ou en sortie (bornier à vis), protections sans doute nécessaire (décharges électrostatiques, surtensions, court-circuit...)
+   1. (combien?) Ports ADC en entrée (bornier à vis), protections sans doute nécessaire (décharges électrostatiques, surtensions...)
+   1. Plusieurs points de connexions devraient être prévus pour la terre (GND) et le VCC (ou le VCC commuté) afin de pouvoir assembler des composants discrets (résistances) pour protéger les entrées.
+
