@@ -1,11 +1,9 @@
 # Long Range (LoRa) Radio Sensors for AKUINO
-After connecting 17 sensors to a single AKUINO, we were convinced that wireless is very useful...
+After connecting wired 17 sensors to a single AKUINO, we were convinced that wireless is very useful...
 
 With the advent of LoRA transmission technology which ensures a really good indoor range, with the availability of ready to use modules like AdaFruit Feather M0 able to transmit data for years with simple batteries, we are convinced that a very performant solution can be created.
 ## Hardware
 * AdaFruit Feather M0: https://www.adafruit.com/product/3179
-* Lithium Battery: https://shop.mchobby.be/accu-et-regulateur/746-accu-lipo-37v-4400mah-3232100007468.html
-* Possible case (10 x 10cm, 6cm deep): http://be.farnell.com/fr-BE/fibox/pcm-95-60-g/coffret-boite-polycarbonate-gris/dp/2473443
 * 1-Wire sensors have the advantage of being self-identified, "hot-pluggable" and could be connected to one sensor node or another: https://www.maximintegrated.com/en/app-notes/index.mvp/id/4206
   * Serial adapter for 1-Wire gives better reliability than bit-banging (e.g. https://www.mikroe.com/uart-1-wire-click ) but requires 5V. As most 1-Wire devices are happy (but sometimes slower) at 3.3V, fewer devices not too far away will make bit-banging possible.
   * Thermocron (IButton: https://be.farnell.com/fr-BE/c/semiconducteurs-circuits-integres/memoires/accessoires-iboutons/iboutons ) can receive a "mission" and record temperature OFF-LINE for very long period of time: they can be used to ensure cold-chain continuity during transportation. They can even be programmed by a remote radio module: http://arduinofun.blogspot.com/2010/04/arduino-ibutton-data-logger-programmer.html
@@ -13,6 +11,11 @@ With the advent of LoRA transmission technology which ensures a really good indo
   * I2C CO2+temperature+humidity: https://befr.rs-online.com/web/p/products/1720552/?grossPrice=Y&cm_mmc=BE-PLA-DS3A-_-google-_-PLA_BE_NL_Semiconductors-_-Sensor_Ics|Temperature_And_Humidity_Sensors-_-PRODUCT_GROUP&matchtype=&pla-544508151584&gclid=Cj0KCQiAzKnjBRDPARIsAKxfTRA_NGOGs_dE9fBuCA61ZyCIf1GovlkXcqFPyUBE3JYgCDP7rXKEHxUaAuaREALw_wcB&gclsrc=aw.ds
   * I2C Temperature and/or humidity: https://befr.rs-online.com/web/c/semiconductors/sensor-ics/temperature-sensors-humidity-sensors/?searchTerm=i2c%20sensor&applied-dimensions=4293448979,4294510394,4294490065,4294505396,4294510395,4294510203,4294356324,4294821500 and also https://www.tindie.com/products/akdracom/temperature-humidity-sensor-probe-precision-ic/
   * Wiring standard QWIIC from Sparkfun seems just nice: https://www.sparkfun.com/qwiic Beware: AdaFruit standard is different!
+* Lithium Battery: https://shop.mchobby.be/accu-et-regulateur/746-accu-lipo-37v-4400mah-3232100007468.html , https://be.farnell.com/fr-BE/mikroelektronika/mikroe-1120/batterie-lithium-polymer-3-7v/dp/2786900 , https://www.onlylipo.com/21-1s-37-volts-1-element
+* Enclosures:
+  * Central "data sink" connected by Ethernet (RJ45) to the Internet router: https://www.thingiverse.com/thing:3149509
+  * 8 x 8cm, 5cm deep: many electrical junction boxes
+  * 10 x 10cm, 6cm deep: http://be.farnell.com/fr-BE/fibox/pcm-95-60-g/coffret-boite-polycarbonate-gris/dp/2473443
 
 ## Software
 * RadioHead libraries: http://www.airspayce.com/mikem/arduino/RadioHead/index.html Be sure to use the latest version (1.89)
@@ -28,7 +31,9 @@ With the advent of LoRA transmission technology which ensures a really good indo
   * UECIDE would be prefered if SAMD suppport / AdaFruit Feather M0 was supported (not really, too bad)
 ## LoRa
 * Allowed duty cycle and power in different 868MHz bands: https://www.disk91.com/2017/technology/internet-of-things-technology/all-what-you-need-to-know-about-regulation-on-rf-868mhz-for-lpwan/ From this document, the best local bandwidth could be 869,3 to 869,4 limited to 10mW but with no duty cycle constraint.
-* 433 MHz may not be allowed in production within Europe: the project may have to be announced as "RFID" if we stick to those frequencies.
+  * We measured 7 packets of 37 characters per seconds when testing this radio band.  
+* 433 MHz may not be allowed in production within Europe: the project may have to be announced as "RFID" if we stick to those frequencies
+  * In this band, we reached 540 meters in a corn field (emmiter and receiver at the corn height; single wire antenna)
 * Calculator of Allowed duty cycle for different LoRa configurations: https://docs.google.com/spreadsheets/d/1COg2J1at6j8meehTtvfj5TIiM8pbj4SvKf7sa-Oq5fU/edit#gid=1628588258
 ## Sensors
 Each node can receive many kind of sensors and its firmware can be adapted for each situation: the USB programming port of the node can be used to either change the firmware or to access a terminal console and change parameters.
@@ -73,7 +78,7 @@ There are different encoding formats:
 * BER from ASN.1
 * SensML: https://tools.ietf.org/html/rfc8428
 
-The one we propose is more compact if we intend to develop our own protocol instead of LoRaWAN (or other IoT protocol that would be compact enough for LoRa).
+The one we propose is more compact so we intend to develop our own protocol instead of LoRaWAN (or other IoT protocol that would be compact enough for LoRa).
 * Sensors Data message: a 32 bits timestamp followed by a sequence of key-value pairs with our proposed encoding:
   * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte). A key may appear in multiple key-value pairs (array of values)
   * value encoding format: 3 bits (0 to 7) in the same byte (lower bits)
@@ -152,6 +157,7 @@ We will use a serial terminal (USB) to set the configuration parameters (ANSI ch
 A basic polling cycle (e.g. 3 minutes) has to be set. Each key can be obtained either at each poll or at a configured multiple.
 
 ## References
+* The Ten Commandments of Wireless Communications: http://www.bb-elec.com/Learning-Center/All-White-Papers/Wireless-Cellular/10-Commandments-of-Wireless-Communications/10_Commandments_Wireless_WP033_R2-1112.pdf
 * Detailed RadioHead interface: https://github.com/adafruit/RadioHead/blob/master/RH_RF95.h
 * The standard pinout of Feather M0 is: https://cdn-learn.adafruit.com/assets/assets/000/046/244/original/adafruit_products_Feather_M0_Basic_Proto_v2.2-1.png?1504885373
 * Similar project but for very long range: http://cpham.perso.univ-pau.fr/LORA/WAZIUP/FAQ.pdf
