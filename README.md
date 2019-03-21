@@ -78,7 +78,8 @@ There are different encoding formats:
 * BER from ASN.1
 * SensML: https://tools.ietf.org/html/rfc8428
 
-The one we propose is more compact so we intend to develop our own protocol instead of LoRaWAN (or other IoT protocol that would be compact enough for LoRa).
+The two we propose are more compact so we intend to develop our own protocol instead of LoRaWAN (or other IoT protocol that would be compact enough for LoRa).
+### Format 1
 * Sensors Data message: a 32 bits timestamp followed by a sequence of key-value pairs with our proposed encoding:
   * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte). A key may appear in multiple key-value pairs (array of values)
   * value encoding format: 3 bits (0 to 7) in the same byte (lower bits)
@@ -101,6 +102,9 @@ The one we propose is more compact so we intend to develop our own protocol inst
   * allocation table field: 3 bits (0 to 7) in the same byte (lower bits)
   * 2 to 7: (1 to height bytes) byte 0 = I2C device address; byte 1 = device sub-type; byte 3 to 6 = configuration byte 1 to 4
 * Actuators setting messages have the same format but registers (0-31) are independant than those for sensors.
+### Format 2
+Please look at project AKUINO/BCDIC !
+
 * Retransmission request: timestamp + pairs of bytes for each ID intervals ("begin ID"-"end ID") that needs to be (re)transmitted. Overflow may occur (increment of 255 is 0) and "end ID" can be lower than "begin ID".
 * Retransmission: message with exactly the same Header (TO, FROM, ID, FLAGS) and Payload than the one transmitted before
 
