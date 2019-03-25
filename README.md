@@ -7,13 +7,19 @@ With the advent of LoRA transmission technology which ensures a really good indo
 * 1-Wire sensors have the advantage of being self-identified, "hot-pluggable" and could be connected to one sensor node or another: https://www.maximintegrated.com/en/app-notes/index.mvp/id/4206
   * Serial adapter for 1-Wire gives better reliability than bit-banging (e.g. https://www.mikroe.com/uart-1-wire-click ) but requires 5V. As most 1-Wire devices are happy (but sometimes slower) at 3.3V, fewer devices not too far away will make bit-banging possible.
   * Thermocron (IButton: https://be.farnell.com/fr-BE/c/semiconducteurs-circuits-integres/memoires/accessoires-iboutons/iboutons ) can receive a "mission" and record temperature OFF-LINE for very long period of time: they can be used to ensure cold-chain continuity during transportation. They can even be programmed by a remote radio module: http://arduinofun.blogspot.com/2010/04/arduino-ibutton-data-logger-programmer.html
+  * Mains Switch: https://www.axiris.eu/en/index.php/1-wire/1-wire-mains-switch
 * I2C sensors are often working at 3.3V and 5V. Short wires though (20 cm max: should be in the same box than the radio module)
   * I2C CO2+temperature+humidity: https://befr.rs-online.com/web/p/products/1720552/?grossPrice=Y&cm_mmc=BE-PLA-DS3A-_-google-_-PLA_BE_NL_Semiconductors-_-Sensor_Ics|Temperature_And_Humidity_Sensors-_-PRODUCT_GROUP&matchtype=&pla-544508151584&gclid=Cj0KCQiAzKnjBRDPARIsAKxfTRA_NGOGs_dE9fBuCA61ZyCIf1GovlkXcqFPyUBE3JYgCDP7rXKEHxUaAuaREALw_wcB&gclsrc=aw.ds
   * I2C Temperature and/or humidity: https://befr.rs-online.com/web/c/semiconductors/sensor-ics/temperature-sensors-humidity-sensors/?searchTerm=i2c%20sensor&applied-dimensions=4293448979,4294510394,4294490065,4294505396,4294510395,4294510203,4294356324,4294821500 and also https://www.tindie.com/products/akdracom/temperature-humidity-sensor-probe-precision-ic/
-  * Wiring standard QWIIC from Sparkfun seems just nice: https://www.sparkfun.com/qwiic Beware: AdaFruit standard is different!
+  * Grove Wiring standard is often used and is similar to QWIIC from Sparkfun: https://www.sparkfun.com/qwiic (Grove as a normal pitch connector, Sparkfun is smaller; Beware: AdaFruit standard is different!):
+  1. Yellow - SCL
+  1. White - SDA (Blue for QWIIC)
+  1. Red - VCC on all Grove Connectors
+  1. Black - GND on all Grove Connectors
 * Lithium Battery: https://shop.mchobby.be/accu-et-regulateur/746-accu-lipo-37v-4400mah-3232100007468.html , https://be.farnell.com/fr-BE/mikroelektronika/mikroe-1120/batterie-lithium-polymer-3-7v/dp/2786900 , https://www.onlylipo.com/21-1s-37-volts-1-element
 * Enclosures:
   * Central "data sink" connected by Ethernet (RJ45) to the Internet router: https://www.thingiverse.com/thing:3149509
+  * We selected KRADEX 64mm x 88mm x 42mm: https://www.tme.eu/fr/details/z-56jh-abs/boitiers-universels/kradex/z56jh-abs/ looking like CEL-MAR 1-Wire boxes that we also use.
   * 8 x 8cm, 5cm deep: many electrical junction boxes
   * 10 x 10cm, 6cm deep: http://be.farnell.com/fr-BE/fibox/pcm-95-60-g/coffret-boite-polycarbonate-gris/dp/2473443
 
@@ -72,14 +78,13 @@ In theory, the receiving side in Linux could simulate an OWFS 1-Wire bus access 
   * Sensors Data message: see below
 
 ## Sensors Data Messages
-There are different encoding formats:
-* CayenneLPP format which is used by LoRaWAN and already supported by existing libraries ( https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload )
-* NDN TLV (Type-Length-Value)
-* BER from ASN.1
-* SensML: https://tools.ietf.org/html/rfc8428
+There are many encoding formats (see bottom of https://github.com/AKUINO/JBCDIC/blob/master/README.md ).
 
-The two we propose are more compact so we intend to develop our own protocol instead of LoRaWAN (or other IoT protocol that would be compact enough for LoRa).
-### Format 1
+Those we propose are more compact (we think) and we intend to develop our own protocol instead of LoRaWAN.
+
+### Format 1 (Binary)
+This format will be used only if others are not adopted (format 2 https://github.com/AKUINO/JBCDIC is prefered for now). This format is very compact because of the limitation of 32 sensors per module.
+
 * Sensors Data message: a 32 bits timestamp followed by a sequence of key-value pairs with our proposed encoding:
   * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte). A key may appear in multiple key-value pairs (array of values)
   * value encoding format: 3 bits (0 to 7) in the same byte (lower bits)
@@ -102,20 +107,6 @@ The two we propose are more compact so we intend to develop our own protocol ins
   * allocation table field: 3 bits (0 to 7) in the same byte (lower bits)
   * 2 to 7: (1 to height bytes) byte 0 = I2C device address; byte 1 = device sub-type; byte 3 to 6 = configuration byte 1 to 4
 * Actuators setting messages have the same format but registers (0-31) are independant than those for sensors.
-### Format 2
-Please look at project AKUINO/BCDIC !
-
-* Retransmission request: timestamp + pairs of bytes for each ID intervals ("begin ID"-"end ID") that needs to be (re)transmitted. Overflow may occur (increment of 255 is 0) and "end ID" can be lower than "begin ID".
-* Retransmission: message with exactly the same Header (TO, FROM, ID, FLAGS) and Payload than the one transmitted before
-
-All nodes will be responsible to keep a buffer of the last messages (254 last messages for sensors and 254 last messages for actuators) they sent.
-
-Redundancy of central module is possible: the two modules then share the same ID. A central module may not have received a package and therefore ask to retransmit a message well received by the other module: redundant transmissions are therefore discarded based on ID+timestamp.
-
-## Radio packet representation 
-This format will be used only if CayenneLPP ( https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload ) or others (TLV, ASN.BER) are not adapted. Our format is more compact because of the limitation of 32 sensors per module.
-
-Another interesting format is SensML: https://tools.ietf.org/html/rfc8428
 
 Timestamp is the number of seconds since 01/01/2018 but the lowest values (0, 1, 2, ...) indicates different statuses and conditions needed to be solved before resynchronizing the clocks or resuming transmissions.
 
@@ -139,6 +130,10 @@ Timestamp is the number of seconds since 01/01/2018 but the lowest values (0, 1,
 
 It could contain several sequences of Key, Value Format and Value depending on the number of sensors connected to the module.
 
+### Format 2 (Character encoding)
+
+Please look at project AKUINO/JBCDIC: https://github.com/AKUINO/JBCDIC !
+
 ## Protocol
 * A potential source of inspiration: https://github.com/fredilarsen/ModuleInterface/blob/master/documentation/Protocol.md
 * A remote module (sensors) is sleeping most of the time (does not listen to radio) and awakens from time to time (around 3 minutes) to collect data and send it to the central module.
@@ -148,6 +143,12 @@ It could contain several sequences of Key, Value Format and Value depending on t
 * For remote module, the sender keeps listening for eventual input messages from the destination (actuators settings, sensors data retransmission requests) during a short period of time.
 * If a remote module notices that some actuators settings are missing, it requests their retransmission.
 * Sensor nodes send their 1-Wire / I2C Allocation table either periodically (about an hour), either when some connection changes is detected or whenever a request for it is received from the central node
+* Retransmission request: timestamp + pairs of bytes for each ID intervals ("begin ID"-"end ID") that needs to be (re)transmitted. Overflow may occur (increment of 255 is 0) and "end ID" can be lower than "begin ID".
+* Retransmission: message with exactly the same Header (TO, FROM, ID, FLAGS) and Payload than the one transmitted before
+
+All nodes will be responsible to keep a buffer of the last messages (254 last messages for sensors and 254 last messages for actuators) they sent.
+
+Redundancy of central module is possible: the two modules then share the same ID. A central module may not have received a package and therefore ask to retransmit a message well received by the other module: redundant transmissions are therefore discarded based on ID+timestamp.
 
 ## Configuration
 We will use a serial terminal (USB) to set the configuration parameters (ANSI character codes for colors). We have the necessary code in C++ for PIC32. The configuration will have to assign a key (0 to 31) to the physically connected ports:
