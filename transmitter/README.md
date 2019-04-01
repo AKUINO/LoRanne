@@ -20,28 +20,38 @@ The transmitter is based on the Adafruit Feather M0 with a LoRa transmitter (htt
 Connector|Code|Data Pin|Power Activation Pin|Remark
 ---------|----|--------|--------------------|------
 J1-1|g|||GND
-J1-2|T|TX (15)|A3 (8)|Serial TX
-J1-3|R|RX (14)||A3 (8)|Serial RX
-J1-4|v||A3 (8)
+J1-2|T|TX (15)|A3 (8)|Serial TX, 10k pull-up
+J1-3|R|RX (14)||Serial RX
+J1-4|v||A3 (8)|Limited (see below)
 J1-5|g|||GND
-J1-6|C|SCL (18)|D11 (23)
-J1-7|D|SDA (17)|D11 (23)
-J1-8|v||D11 (23)
+J1-6|C|SCL (18)|D11 (23)|5k pull-up
+J1-7|D|SDA (17)|D11 (23)|5k pull-up
+J1-8|v||D11 (23)|Limited (see below)
 J1-9|g|||GND
-J1-10|O|D13 (25)|limited by 100 ohm (LED)
-J1-11|I|A0 (5)|Button switch; Protected and filtered for 50Hz
-J1-12|v||VCC limited by 100 ohm
+J1-10|O|D13 (25)||limited by 100 ohm (LED)
+J1-11|I|A0 (5)||Button switch; Protected and filtered for 50Hz
+J1-12|v|||VCC limited by 100 ohm
 J2-1|g|||GND
-J2-2|1|A1 (6)|Protected and filtered for 50Hz
-J2-3|v||A4 (9)
+J2-2|1|A1 (6)||Protected and filtered for 50Hz
+J2-3|v||A4 (9)|Limited (see below)
 J2-4|g|||GND
-J2-5|2|A2 (7)|Protected and filtered for 50Hz
-J2-6|v||A5 (10)
+J2-5|2|A2 (7)||Protected and filtered for 50Hz
+J2-6|v||A5 (10)|Limited (see below)
 J2-7|g|||GND
-J2-8|1|D5 (19)|D12 (24)
-J2-9|v||D12 (24)
+J2-8|W|D5 (19)|D12 (24)|1-Wire, 5k pull-up
+J2-9|v||D12 (24)|Limited (see below)
 J2-10|10|D10 (22)
 J2-11|6|D6 (20)
 J2-12|v7||D12 (24)|7 volts to power RFID/NFC reader
 
-Distributed power is protected by a 300ma temporary fuse and by a 18µH inductance and a 3µF capacitor.
+Distributed power is switched by a TBD62783APG DMOS transistor array (clamping diode included), limited by a 300ma temporary fuse, a 18µH inductance and sustained by a 3µF capacitor.
+
+Detailed Eagle schema and board definition are in this directory.
+
+## Software
+* Radiohead for encrypted Lora transmissions
+* Periodical wake-ups for collection of sensors values and LoRa transmission (Listen before talk, random delay)
+* USB Serial port for the configuration wizard
+* JBCDIC for data compression
+* Round Robin Buffer for unacknowledged transmitted data
+* Watchdog on button for immediate wakeup, NFC/RFID scan and immediate transmission of status data (including the "button pressed" indication)
