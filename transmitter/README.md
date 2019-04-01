@@ -20,15 +20,15 @@ The transmitter is based on the Adafruit Feather M0 with a LoRa transmitter (htt
 Connector|Code|Data Pin|Power Activation Pin|Remark
 ---------|----|--------|--------------------|------
 J1-1|g|||GND
-J1-2|T|||Serial TX|GPIOA3 (8)
-J1-3|R|||Serial RX|GPIOA3 (8)
+J1-2|T|TX (15)|A3 (8)|Serial TX
+J1-3|R|RX (14)||A3 (8)|Serial RX
 J1-4|v||A3 (8)
 J1-5|g|||GND
-J1-6|C|SCL|GPIO11 (23)
-J1-7|D|SDA|GPIO11 (23)
-J1-8|v||GPIO11 (23)
+J1-6|C|SCL (18)|D11 (23)
+J1-7|D|SDA (17)|D11 (23)
+J1-8|v||D11 (23)
 J1-9|g|||GND
-J1-10|O|GPIO13 (25)|limited by 100 ohm (LED)
+J1-10|O|D13 (25)|limited by 100 ohm (LED)
 J1-11|I|A0 (5)|Button switch; Protected and filtered for 50Hz
 J1-12|v||VCC limited by 100 ohm
 J2-1|g|||GND
@@ -38,10 +38,10 @@ J2-4|g|||GND
 J2-5|2|A2 (7)|Protected and filtered for 50Hz
 J2-6|v||A5 (10)
 J2-7|g|||GND
-J2-8|1|GPIO5|GPIO12 (24)
-J2-9|v||GPIO12 (24)
-J2-10|10|GPIO10 (22)
-J2-11|6|GPIO6 (20)
-J2-12|v7||GPIO12 (24)|7 volts to power RFID/NFC reader
+J2-8|1|D5 (19)|D12 (24)
+J2-9|v||D12 (24)
+J2-10|10|D10 (22)
+J2-11|6|D6 (20)
+J2-12|v7||D12 (24)|7 volts to power RFID/NFC reader
 
 Distributed power is protected by a 300ma temporary fuse and by a 18µH inductance and a 3µF capacitor.
