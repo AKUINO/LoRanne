@@ -40,8 +40,8 @@ J2-6|v||A5 (10)|Switched and limited Vcc (see below)
 J2-7|g|||GND
 J2-8|W|D5 (19)|D12 (24)|1-Wire bus, 5k pull-up
 J2-9|v||D12 (24)|Switched and limited Vcc (see below)
-J2-10|10|D10 (22)|Switched and limited Vcc (see below)
-J2-11|6|D6 (20)|Switched and limited Vcc (see below)
+J2-10|10|D10 (22)||Switched and limited Vcc (see below)
+J2-11|6|D6 (20)||Switched and limited Vcc (see below)
 J2-12|v7||D12 (24)|Switched 7 volts to power RFID/NFC reader (small DC/DC converter from D12)
 
 Distributed power is switched by a TBD62783APG DMOS transistor array (clamping diode included), limited by a 300ma temporary fuse, a 18µH inductance and sustained by a 3µF capacitor.
