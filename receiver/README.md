@@ -1,7 +1,7 @@
 # Receiver (Data Sink)
 One or more gateway (receiver) can collect the data emitted by the different transmitters (radio modules with sensors connected).
 
-The receiver(s) is always listening (never sleeps) and respond immediately when it receives a message:
+The receiver(s) is always listening (never sleeps) and responds immediately when it receives a message:
 1. it acknowledges the received message
 1. if a further answer is needed (current time for instance), it sends it immediately
 
@@ -25,5 +25,10 @@ The enclosure is big enough to guest a 18650 battery for continuous operation ev
 
 ## Software
 
-The software is a mirror of the one used by the transmitter.
+The software is a mirror of the one used by the transmitter. It must:
+1. answer to connecting transmitters and provide them the date/time (1 second precision, 32 bits number starting 01/01/2019)
+2. assign a reduced numerical id for every string (name, 1-Wire ID, I2C peripheral, etc.) submitted by a transmitter: this allows compression of strings that may need to be transmitted by Radio. If the receiver fails, the transmitters can provide their local part of the dictionary when it restarts.
+3. it retrieves sensors configuration (for the parameters needed to be known locally if any) from the ELSA web application. Those parameters are archived on the SD card in case of Internet failure. Amongst those parameters, alarm levels for some sensors, set points for opening/closing valves or switches, etc.
+4. it sends data to the ELSA web application (also archived on the SD card)
+
 
