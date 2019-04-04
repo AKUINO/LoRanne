@@ -3,6 +3,13 @@ After connecting wired 17 sensors to a single AKUINO, we were convinced that wir
 
 With the advent of LoRA transmission technology which ensures a really good indoor range, with the availability of ready to use modules like AdaFruit Feather M0 able to transmit data for years with simple batteries, we are convinced that a very performant solution can be created.
 ## Hardware
+
+Transmitters (working on batteries, collecting and transmitting sensors data, sleeping most of the time) are explained further here: https://github.com/AKUINO/RadioSensor/tree/master/transmitter
+
+Receiver(s) (powered, collecting transmitted data, archiving it locally, transmitting on Internet, never sleeping) is explained further here: https://github.com/AKUINO/RadioSensor/tree/master/receiver
+
+General design considerations:
+
 * AdaFruit Feather M0: https://www.adafruit.com/product/3179
 * 1-Wire sensors have the advantage of being self-identified, "hot-pluggable" and could be connected to one sensor node or another: https://www.maximintegrated.com/en/app-notes/index.mvp/id/4206
   * Serial adapter for 1-Wire gives better reliability than bit-banging (e.g. https://www.mikroe.com/uart-1-wire-click ) but requires 5V. As most 1-Wire devices are happy (but sometimes slower) at 3.3V, fewer devices not too far away will make bit-banging possible.
@@ -59,12 +66,13 @@ List of existing device types: http://owfs.org/index.php?page=family-code-list
 The device types that we really need to support at first are:
 * 26 for the DS2438 Battery Monitor (used as an ADC for various types of sensors like RH, CO2...)
 * 28 for the DS18B20 Temperature Sensor; a library directly supporting this device seems to exist: https://github.com/milesburton/Arduino-Temperature-Control-Library This may be the best way to start supporting some sensors...
+* 01 for the DS1990 simulated by RFID badge reader
 
-A very important information, because we want to support auto-configuration, is the allocation table which maps each 1-Wire device (64 bits ID numbers) to one of the 30 available data registers (see below). In register 0, a checksum of this allocation table must be sent with each radio data packet so the central node knows if it is synchronized with the sensor node (if it has the latest version of the allocation table).
+A central directory of 1-Wire devices will be kept locally but also in the Receiver (and in ELSA application).
 
 Every minutes or 5 (or any delay set in configuration), the node will transmit the raw data (no scaling) read for the different sensors. The allocation table will be transmitted every hour (or delay set in configuration) or on request by the central node (after detection of a checksum mismatch with the allocation table).
 
-In theory, the receiving side in Linux could simulate an OWFS 1-Wire bus access layer (owserver): application software would see radio data like a standard OWFS locally wired device. In practice, we believe that data will have to be processed by the sensor node to transmit only specific data values like "temperature" and not all registers of the device. A different abstraction is needed and the design of the allocation table will have to take this into account: discussion below...
+Data will be processed by the sensor node to transmit only specific JSON data values like "temperature" and not all registers of the device.
 
 ## Messages
 * Encryption: http://www.airspayce.com/mikem/arduino/RadioHead/classRHEncryptedDriver.html#details
@@ -80,59 +88,7 @@ In theory, the receiving side in Linux could simulate an OWFS 1-Wire bus access 
 ## Sensors Data Messages
 There are many encoding formats (see bottom of https://github.com/AKUINO/JBCDIC/blob/master/README.md ).
 
-Those we propose are more compact (we think) and we intend to develop our own protocol instead of LoRaWAN.
-
-### Format 1 (Binary)
-This format will be used only if others are not adopted (format 2 https://github.com/AKUINO/JBCDIC is prefered for now). This format is very compact because of the limitation of 32 sensors per module.
-
-* Sensors Data message: a 32 bits timestamp followed by a sequence of key-value pairs with our proposed encoding:
-  * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte). A key may appear in multiple key-value pairs (array of values)
-  * value encoding format: 3 bits (0 to 7) in the same byte (lower bits)
-  * 0: value is zero
-  * 1: value is one
-  * 2: one byte integer value
-  * 3: two bytes signed integer value
-  * 4: three bytes signed integer value
-  * 5: four bytes signed integer value
-  * 6: six bytes small floating point number
-  * 7: height bytes floating point number
-  * value with the number of bytes given by the format (0 to 8 bytes)
-* 1-Wire Allocation table message (sent every hour or on request from the central node):
-  * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte) identifying a data register transmitted in data messages.
-  * allocation table field: 3 bits (0 to 7) in the same byte (lower bits)
-  * 0 to 6 : to be decided, content will have the same length than the length specified for Data messages values.
-  * 7: height bytes = 64bits 1-Wire device address
-* I2C Allocation table message (sent every hour or on request from the central node):
-  * key: 5 bits (sensor id 0 to 31) (higher bits of 1st byte) identifying a data register transmitted in data messages.
-  * allocation table field: 3 bits (0 to 7) in the same byte (lower bits)
-  * 2 to 7: (1 to height bytes) byte 0 = I2C device address; byte 1 = device sub-type; byte 3 to 6 = configuration byte 1 to 4
-* Actuators setting messages have the same format but registers (0-31) are independant than those for sensors.
-
-Timestamp is the number of seconds since 01/01/2018 but the lowest values (0, 1, 2, ...) indicates different statuses and conditions needed to be solved before resynchronizing the clocks or resuming transmissions.
-
-	0              5        7
-	+-- -- -- -- --+-- -- --+
-	|  TIMESTAMP (4 bytes)  |
-	+-- -- -- -- --+-- -- --+
-	|     FROM (1 byte)     |
-	+-- -- -- -- --+-- -- --+
-	|      TO (1 byte)      |
-	+-- -- -- -- --+-- -- --+
-	|   KEY 5 bits | VAL.For|
-	|  VALUE (0 To 8 Bytes) |
-	+-- -- -- -- --+-- -- --+
-	|   KEY 5 bits | VAL.For|
-	|  VALUE (0 To 8 Bytes) |
-	+-- -- -- -- --+-- -- --+
-	|   KEY 5 bits | VAL.For|
-	|  VALUE (0 To 8 Bytes) |
-	+-- -- -- -- --+-- -- --+
-
-It could contain several sequences of Key, Value Format and Value depending on the number of sensors connected to the module.
-
-### Format 2 (Character encoding)
-
-Please look at project AKUINO/JBCDIC: https://github.com/AKUINO/JBCDIC !
+Please look at our proposal, the project AKUINO/JBCDIC: https://github.com/AKUINO/JBCDIC !
 
 ## Protocol
 * A potential source of inspiration: https://github.com/fredilarsen/ModuleInterface/blob/master/documentation/Protocol.md
