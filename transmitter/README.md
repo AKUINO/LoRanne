@@ -48,6 +48,44 @@ Distributed power is switched by a TBD62783APG DMOS transistor array (clamping d
 
 Detailed Eagle schema and board definition are in this directory.
 
+## Data transmitted
+
+Data is encoded using JBCIC ( https://github.com/AKUINO/JBCDIC ). A message is made of one or more measurement sessions up to the LoRa maximum size (53 bytes in our case).
+
+One measurements session is a JSON object (a message is implicitely an array of JSON objects) with the following properties:
+
+Property|Connection|Pin|Description
+--------|----------|---|-----------
+H0|||Seconds ellapsed since module startup. H0 is replaced by H with the correct time by the receiver before resending to the Web application
+H|||Seconds since 01/01/2019 (if time was broadcasted by receiver ("data sink") and synchronized with transmitter)
+N|||Network Identification number: Not transmitted but added by the receiver before resending to the Web application
+M|||Radio Module Identification number: Not transmitted but added by the receiver before resending to the Web application
+A0|J1-11|A0|Button pressed? Not transmitted if 0
+A1|J2-2|A1|Analog input 1. Not transmitted if 0
+A2|J2-5|A2|Analog input 2. Not transmitted if 0
+B||A6|Battery voltage
+B5||A7|USB voltage (if present). Usually 5 volts if connected
+B9|||Last RSSI of messages broadcasted by Receiver (decimal)
+C|J1-3|RX|Serial data received (string)
+Dnnn|J2-8|D5|Value (or array of values or object with different properties) obtained from 1-Wire device at address "nnn..." (decimal)
+G|J2-8|D5|Last badge read by RFID reader (encoded in decimal). Not transmitted if none
+G0|J1-10|D13|Button LED on? Not transmitted if not
+G1|J2-10|D10|Yellow LED of RFID reader is on? Not transmitted if not
+G2|J2-11|D6|Red LED of RFID reader is on? Not transmitted if not
+Innn|J1-7|I2C|Value (or array of values or object with different properties) obtained from I2C device at address "nnn" (decimal)
+
+### Data transmission example
+
+Before compression to 4 bits per character:
+`{H0+3602A0+1B+3-12B9-78D159300978176+27-2I68[+27-5+40-5]}`
+which means:
+* `H0+3602` : 30602 seconds elapsed since starting the radio module
+* `A0+1` : Button is pressed
+* `B+3-12` : Battery is 3.12V
+* `B9-78` : Last RSSI was -78 (in decimal)
+* `D159300978176+27-2` : the temperature sensor address is 0x2517140600 (not including the leading 0x28 indicating its type and the trailing byte providing an CRC) and its temperature is 27.2°C
+* `I68[+27-5+40-5]` : the I2C device at address 0x44 (usually an SHT31 sensor) provides two values: 27.5°C and 40.5% rH
+
 ## Software
 * Radiohead for encrypted Lora transmissions
 * Periodical wake-ups for collection of sensors values and LoRa transmission (Listen before talk, random delay)
