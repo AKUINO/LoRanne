@@ -60,6 +60,7 @@ H0|||Seconds ellapsed since module startup. H0 is replaced by H with the correct
 H|||Seconds since 01/01/2019 (if time was broadcasted by receiver ("data sink") and synchronized with transmitter)
 N|||Network Identification number: Not transmitted but added by the receiver before resending to the Web application
 M|||Radio Module Identification number: Not transmitted but added by the receiver before resending to the Web application
+R|||RSSI for this message: Not transmitted but added by the receiver before resending to the Web application
 A0|J1-11|A0|Button pressed? Not transmitted if 0
 A1|J2-2|A1|Analog input 1. Not transmitted if 0
 A2|J2-5|A2|Analog input 2. Not transmitted if 0
@@ -79,17 +80,34 @@ Innn|J1-7|I2C|Value (or array of values or object with different properties) obt
 Before compression to 4 bits per character:
 `{H0+3602A0+1B+3-12B9-78D159300978176+27-2I68[+27-5+40-5]}`
 which means:
-* `H0+3602` : 30602 seconds elapsed since starting the radio module
+* `H0+3602` : 3602 seconds elapsed since starting the radio module
 * `A0+1` : Button is pressed
 * `B+3-12` : Battery is 3.12V
 * `B9-78` : Last RSSI was -78 (in decimal)
 * `D159300978176+27-2` : the temperature sensor address is 0x2517140600 (not including the leading 0x28 indicating its type and the trailing byte providing an CRC) and its temperature is 27.2°C
 * `I68[+27-5+40-5]` : the I2C device at address 0x44 (usually an SHT31 sensor) provides two values: 27.5°C and 40.5% rH
 
+The receiver will receive this data and retransmit it to the Internet application in standard JSON and adding network/module identification:
+
+~~~~
+  [ { H:(date/time in seconds elapsed since 1/1/1970 as in UNIX),
+     N:1,   (network id)
+     M:3,   (module id)
+     R:-77,   (RSSI of transmitted message)
+     A0:1,     
+     B:3.12,    
+     B9:-78,    
+     D159300978176:27.2,    
+     I68:[27.5,40.5]   
+    } 
+  ]
+~~~~
+
 ## Software
-* Radiohead for encrypted Lora transmissions
+* Radiohead library for encrypted Lora transmissions
+* Protohead for simultaneous execution of data collection and radio transmission
 * Periodical wake-ups for collection of sensors values and LoRa transmission (Listen before talk, random delay)
 * USB Serial port for the configuration wizard
 * JBCDIC for data compression
-* Round Robin Buffer for unacknowledged transmitted data
+* FIFO Round Robin Buffer for unacknowledged transmitted data
 * Watchdog on button for immediate wakeup, NFC/RFID scan and immediate transmission of status data (including the "button pressed" indication)
