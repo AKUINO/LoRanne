@@ -125,6 +125,7 @@ A basic polling cycle (e.g. 3 minutes) has to be set. Each key can be obtained e
   * http://cpham.perso.univ-pau.fr/LORA/WAZIUP/SUTS-demo-slides.pdf
 * CayenneLPP: https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload
 * PJON, an alternative transmission protocol: https://github.com/fredilarsen/ModuleInterface/blob/master/documentation/Protocol.md
+* PlugAndPlay mechanism for small IoT networks using "off the shelf" sensors: http://pitkaaho.net/varasto/2013_IJSNet.pdf
 * MainFlux does not seems to be locking anything (to double check!) and is involved in FIWARE and is very near of a good gateway for ELSA: https://www.mainflux.com/index.html
 * LORD-MicroStrain is locking by the hardware : https://github.com/LORD-MicroStrain/
 * UbiWorX is locking by the platform: https://ubiworx.com/documentation/introduction/introduction.html
