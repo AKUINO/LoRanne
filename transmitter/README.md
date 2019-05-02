@@ -111,3 +111,6 @@ The receiver will receive this data and retransmit it to the Internet applicatio
 * JBCDIC for data compression
 * FIFO Round Robin Buffer for unacknowledged transmitted data
 * Watchdog on button for immediate wakeup, NFC/RFID scan and immediate transmission of status data (including the "button pressed" indication)
+
+## Extensions
+* To control equipement in adverse electrical environments, insulation of 1-Wire bus may be useful:  http://www.ti.com/lit/ds/symlink/iso1540.pdf
