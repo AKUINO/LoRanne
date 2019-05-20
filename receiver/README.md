@@ -31,8 +31,8 @@ RST||MCU Reset
 3V|Vcc|3V3 power, 250ma for MCU, 250ma available for all other boards
 NC||Not connected
 GND|GND|GROUND common to all boards
-A0|GPIO 26|Relay 1 disable. ADC not working when Wifi works
-A1|GPIO 25|Relay 1 enable. ADC not working when Wifi works
+A0|GPIO 26|Relay 1 enable. ADC not working when Wifi works
+A1|GPIO 25|Relay 1 disable. ADC not working when Wifi works
 A2|GPI 34|Input only!
 A3|GPI 39|Input only!
 A4|GPI 36|Input only!
