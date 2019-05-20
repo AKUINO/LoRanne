@@ -23,6 +23,40 @@ The receiver is a simple stack of the following AdaFruit boards (from bottom to 
 
 The enclosure is big enough to guest a 18650 battery for continuous operation even during a long power breakdown.
 
+### Pinout
+
+PCB Pin|ESP32 Pin|Remark
+-------|---------|------
+RST||MCU Reset
+3V|Vcc|3V3 power, 250ma for MCU, 250ma available for all other boards
+NC||Not connected
+GND|GND|GROUND common to all boards
+A0|GPIO 26|Relay 1 disable. ADC not working when Wifi works
+A1|GPIO 25|Relay 1 enable. ADC not working when Wifi works
+A2|GPI 34|Input only!
+A3|GPI 39|Input only!
+A4|GPI 36|Input only!
+A5|GPIO 4|Relay 2 disable. ADC not working when Wifi works
+SCK|CLCK|SPI Clock (LoRa)
+MO|MOSI|SPI output (LoRa)
+MI|MISO|SPI input (LoRa)
+RX|RX|Serial1 input
+TX|TX|Serial1 output
+21|GPIO 21|Relay 2 enable
+-------|---------|------
+BAT||Battery power
+EN||3V3 regulator enable (disable if 3V3 power provided in another way)
+USB||USB connector power
+13|GPIO 13|Red LED on main board
+12|GPIO 12|Pull down resistor
+27|GPIO 27|LoRa A=Reset LoRa
+33|GPIO 33|LoRa B=ChipSelect SD card
+15|GPIO 15|Button A;LoRa C
+32|GPIO 32|Button B;LoRa D=InterrupReQuest LoRa
+14|GPIO 14|Button C;LoRa E=ChipSelect LoRa
+SCL|SCL|I2C Clock (no pull-up)
+SDA|SDA|I2C Data (no pull-up). OLED address=0x3C. RTC address=0x68
+
 ## Software
 
 The software is a mirror of the one used by the transmitter. It must:
