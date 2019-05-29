@@ -1,15 +1,18 @@
 /*
-	_          _                   _____                           
+          _          _                   _____                           
     /\   | |        (_)                 / ____|                          
-	/  \  | | ___   _ _ _ __   ___ _____| (___   ___ _ __  ___  ___  _ __ 
-	/ /\ \ | |/ / | | | | '_ \ / _ \______\___ \ / _ \ '_ \/ __|/ _ \| '__|
-	/ ____ \|   <| |_| | | | | | (_) |     ____) |  __/ | | \__ \ (_) | |   
-	/_/    \_\_|\_\\__,_|_|_| |_|\___/     |_____/ \___|_| |_|___/\___/|_|   
-	
-	Programme de check-up + envoie des données sur le GateWay via LoRa
-	
+   /  \  | | ___   _ _ _ __   ___ _____| (___   ___ _ __  ___  ___  _ __ 
+  / /\ \ | |/ / | | | | '_ \ / _ \______\___ \ / _ \ '_ \/ __|/ _ \| '__|
+ / ____ \|   <| |_| | | | | | (_) |     ____) |  __/ | | \__ \ (_) | |   
+/_/    \_\_|\_\\__,_|_|_| |_|\___/     |_____/ \___|_| |_|___/\___/|_|   
+
+Programme de check-up + envoie des données sur le GateWay via LoRa
+
 */
 
+
+//id du sensor
+char SENSOR_ID[]="M=5";
 
 #include <Wire.h>
 #include <OneWire.h>
@@ -61,10 +64,6 @@ uint8_t SIZE_BUFFER = 100;
 //Variable a envoyer via LoRa
 char buffer_a_envoyer[100];
 
-
-//id du sensor
-char SENSOR_ID[]="M=3";
-
 //pourcentage de la batterie
 float SENSOR_BATTERY;
 
@@ -93,10 +92,11 @@ unsigned long compteur_end_btn_click;
 
 void setup()
 {
-	
+	delay(1000);
 	
 	Serial.begin(9600);
-	
+	Serial.println('Hello!');
+  delay(1000);
 	
 	
 	//On vide le buffer_a_envoyer
@@ -104,40 +104,46 @@ void setup()
 	
 	//Alimentation(Vcc) de la LED
 	pinMode(13, OUTPUT);
+  digitalWrite(13,HIGH);
 	
 	//Alimentation(Vcc) du 1-Wire
 	pinMode(12, OUTPUT);  
+  digitalWrite(12,LOW);
 	
 	//Alimentation(Vcc) du I²C
 	pinMode(11, OUTPUT);
+  digitalWrite(11,LOW);
 	
+  pinMode(6, OUTPUT);
+  digitalWrite(6,HIGH);
+  
 	pinMode(A0, INPUT_PULLDOWN);
+
+  //Necessary for Door Open/Close detection
+  pinMode(A2, INPUT_PULLUP);
 	
 	//Alimentation(Vcc) de l'analogique A4
 	pinMode(A4, OUTPUT);
+  digitalWrite(A4,LOW);
 	
 	//Alimentation(Vcc) de l'analogique A5
 	pinMode(A5, OUTPUT);
+  digitalWrite(A5,LOW);
 	
 	#define VBATPIN A6
-	
-	
-	
+		
+  Serial1.begin(9600);
+
+  delay(100);
+  digitalWrite(13,LOW);
 }
 
 
-
+long blinkMilli = 0;
 
 void loop()
 {
-	
-	Serial.begin(9600);
-	Serial1.begin(9600);
-	
-	
-	
-	
-	
+			
 	//Variable utilisée pour la récriture du buffer_a_envoyer
 	char v1_string[5];
 	
@@ -146,7 +152,8 @@ void loop()
 		previousMillis = millis(); 
 		
 		
-		
+    digitalWrite(13, HIGH);
+
 		////////////////////////////////////
 		//Récupération du niveau de batterie
 		////////////////////////////////////
@@ -156,14 +163,9 @@ void loop()
 		measuredvbat /= 1024; // convert to voltage
 		SENSOR_BATTERY=measuredvbat;
 		
-		if(Serial)
-		{
-			Serial.println("Niveau de Batterie : " );
-			Serial.println(SENSOR_BATTERY);
-		}
+
 		
-		
-		
+			
 		
 		//On écrit le header(en-tête) du buffer_a_envoyer + Niveau de batterie
 		
@@ -175,9 +177,6 @@ void loop()
 		
 		if(Serial)
 		{
-			
-			//On allume la LED car on est connecté au serial (mode debug)
-			digitalWrite(13, HIGH);
 			
 			Serial.println("########################################");
 			Serial.println("########## Akuino Sensor v1.0 ##########");
@@ -194,6 +193,11 @@ void loop()
 			Serial.print(puissance_signal_LoRa);
 			Serial.print(" mW");
 			Serial.println("");
+			Serial.print("Niveau de Batterie : " );
+			Serial.print(SENSOR_BATTERY);
+			Serial.println(" Volt");
+			Serial.print("ID : " );
+			Serial.println(SENSOR_ID);
 			Serial.println("########################################");
 			Serial.println("");
 			
@@ -203,26 +207,17 @@ void loop()
 		/////////////////////////////////////////////
 		//On alimente toutes les sorties du transitor
 		
-		//Alimentation(Vcc) de la LED
-		pinMode(13, OUTPUT);
-		
 		//Alimentation(Vcc) du 1-Wire
-		pinMode(12, OUTPUT);
 		digitalWrite(12, HIGH);
 		
 		//Alimentation(Vcc) du I²C
-		pinMode(11, OUTPUT);
 		digitalWrite(11, HIGH);
 		
 		//Alimentation(Vcc) de l'analogique A4
-		pinMode(A4, OUTPUT);
 		digitalWrite(A4, HIGH);
 		
 		//Alimentation(Vcc) de l'analogique A5
-		pinMode(A5, OUTPUT);
 		digitalWrite(A5, HIGH);
-		
-		
 		
 		//On démarre le 1-Wire
 		Wire.begin();
@@ -236,41 +231,33 @@ void loop()
 			Serial.println("**********************************************************");
 			Serial.println("Test du port série...");
 			Serial.println("**********************************************************");
+      Serial1.println("TEST PORT SERIE");
+      Serial.println("Données envoyées!");
 		}
-		
-		if(Serial){Serial.print("Envoie de données sur le port série...");}
-		
-		Serial1.println("TEST PORT SERIE");
-		
-		
-		if(Serial){Serial.print("Données envoyées!");}
-		
 		
 		
 		////////////////////////////////////////////////
 		//Analyse et lecture des analogiques disponibles
 		////////////////////////////////////////////////
+    pinA0=digitalRead(A0);
+    pinA1=analogRead(A1);
+    //pinA2=analogRead(A2);
+    pinA2=digitalRead(A2);
+
 		if(Serial)
 		{
 			Serial.println("**********************************************************");
 			Serial.println("Analyse et lecture des analogiques disponibles en cours...");
 			Serial.println("**********************************************************");
+      Serial.print("PIN_A0 = ");
+      Serial.println(pinA0);
+      
+      Serial.print("PIN_A1 = ");
+      Serial.println(pinA1);
+  
+      Serial.print("PIN_A2 = ");
+      Serial.println(pinA2);
 		}
-		
-		pinA0=digitalRead(A0);
-		pinA1=analogRead(A1);
-		pinA2=analogRead(A2);
-		
-		Serial.print("PIN_A0 = ");
-		Serial.println(pinA0);
-		
-		Serial.print("PIN_A1 = ");
-		Serial.println(pinA1);
-		
-		
-		Serial.print("PIN_A2 = ");
-		Serial.println(pinA2);
-		
 		
 		//On écrit
 		//le "moins" permet d'écrire à gauche
@@ -286,22 +273,12 @@ void loop()
 		//On récrit dans la variable du buffer
 		snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&A1=%s", buffer_a_envoyer, v1_string);
 		
-		
 		//On écrit
 		//le "moins" permet d'écrire à gauche
 		dtostrf(pinA2, -1, 0, v1_string);
 		
 		//On récrit dans la variable du buffer
 		snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&A2=%s", buffer_a_envoyer, v1_string);
-		
-		
-		
-		//Si on est en mode DEBUG, alors on laisse un petit delai
-		if(Serial)
-		{
-			delay(3000);
-		}
-		
 		
 		
 		/////////////////////////////////////////
@@ -320,7 +297,8 @@ void loop()
 		}
 		
 		nDevices = 0;
-		for(address = 1; address < 127; address++ ) 
+		//for(address = 1; address < 127; address++ ) 
+    address = 0x44;
 		{
 			/* REMARQUE :
 				* Le scanner utilise la valeur de retour de Write.endTransmisstion
@@ -331,13 +309,10 @@ void loop()
 			
 			if (error == 0)
 			{
-				if(Serial){Serial.println("Un dispositif(device) I²C a été trouvé à l'adresse 0x");}
-				
-				
-				
 				if(Serial)
 				{
-					Serial.print(address,HEX);
+					Serial.print("Un dispositif(device) I²C a été trouvé à l'adresse 0x");
+      					Serial.println(address,HEX);
 				}
 				
 				nDevices++;
@@ -394,46 +369,24 @@ void loop()
 					}
 					
 				}
-				
-				
-				
-				
-				
-				
-				
-				
-				
-				
 			}
 			else if (error==4) 
 			{
-				if(Serial){Serial.print("Erreur inconnue à l'adresse 0x");}
-				
-				if (address<16) 
-				
-				if(Serial)
-				{        
-					Serial.print("0");
+				if(Serial){
+				  Serial.print("Erreur inconnue à l'adresse 0x");
 					Serial.println(address,HEX);
 				}
 				
 			}    
 		}
-		if (nDevices == 0)
-		if(Serial){Serial.print("Aucun dispositif(device) n'a été trouvé! :(");}
-		else
-		if(Serial){Serial.print("Analyse du I²C terminée!");}
-		
-		
-		
-		
-		
-		//Si on est en mode DEBUG, alors on laisse un petit delai
-		if(Serial)
-		{
-			delay(3000);
-		}
-		
+    if (Serial) {
+      if (nDevices == 0) {
+        Serial.println("Aucun dispositif(device) n'a été trouvé!");
+      } else {
+        Serial.println("Analyse du I²C terminée!");
+      }
+    }
+			
 		
 		///////////////////////////////////////////////////////
 		//Analyse et lecture des 1-Wire disponibles en cours...
@@ -441,9 +394,6 @@ void loop()
 		
 		if(Serial)
 		{
-			Serial.println("");
-			Serial.println(".");
-			Serial.println("");
 			Serial.println("*****************************************************");
 			Serial.println("Analyse et lecture des 1-Wire disponibles en cours...");
 			Serial.println("*****************************************************");
@@ -452,7 +402,7 @@ void loop()
 		byte i;
 		byte present = 0;
 		byte data[12];
-		byte addr[8];
+		byte addr[12];
 		
 		
 		
@@ -463,48 +413,10 @@ void loop()
 				if(Serial){Serial.println("Recherche terminée");}
 				
 				ds.reset_search();
-				delay(2500);
-				
-				return;
 			*/
 		}
 		else
 		{
-			
-			if(Serial){Serial.println("--------------");}
-			
-			
-			//On récrit dans la variable du buffer
-			snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&G=", buffer_a_envoyer);
-			
-			Serial.print("ROM =");
-			for( i = 0; i < 8; i++) {
-				Serial.write(' ');
-				if ( addr[i]<16) {
-					Serial.print("0");
-					//le "moins" permet d'écrire à gauche
-					dtostrf(0, -0, 0, v1_string);
-					
-					//On récrit dans la variable du buffer
-					snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s%s", buffer_a_envoyer, v1_string);
-					
-				}
-				if(Serial){Serial.print(addr[i], HEX);}
-				
-				
-				//le "moins" permet d'écrire à gauche
-				dtostrf(addr[i], -0, 0, v1_string);
-				
-				//On récrit dans la variable du buffer
-				snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s%s", buffer_a_envoyer, v1_string);
-				
-			}
-			
-			if (OneWire::crc8(addr, 7) != addr[7]) {
-				if(Serial){Serial.println("CRC invalide!");}
-				return;
-			}
-			if(Serial){Serial.println();}
 			
 			if(Serial)
 			{
@@ -514,16 +426,17 @@ void loop()
 				Serial.print(" = ");
 			}
 			
-			
-			
-			
-			
-			
 			switch (addr[0]) {
 				
 				case 0x01:
 				if(Serial){Serial.println("DS1990 DS2401");}
+        //On récrit dans la variable du buffer
+        snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&G=", buffer_a_envoyer);
+        for( i = 1; i <= 6; i++) {
+          snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s%02x", buffer_a_envoyer, addr[i]);
+        }
 				break;
+
 				case 0x02:
 				if(Serial){Serial.println("DS1991");}
 				break;
@@ -569,8 +482,7 @@ void loop()
 				dtostrf(fonction_return_value, -5, 3, v1_string);
 				
 				//On récrit dans la variable du buffer
-				snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s/DS18B20=%s", buffer_a_envoyer, v1_string);
-				
+				snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&C2=%s", buffer_a_envoyer, v1_string);
 				
 				break;
 				case 0x29:
@@ -589,7 +501,6 @@ void loop()
 				default:
 				if(Serial){Serial.println(" n'est pas répertorié.");}
 				
-				return;
 			} 
 			
 			
@@ -601,14 +512,8 @@ void loop()
 			Serial.print("BUFFER qu'on doit envoyer au Gateway via LoRa ");
 			Serial.print(buffer_a_envoyer);
 		}
-		
-		
-		//Si on est en mode DEBUG, alors on laisse un petit delai
-		if(Serial)
-		{
-			delay(3000);
-		}
-		
+				
+    digitalWrite(13, LOW);
 		
 		//////////////////////////////////
 		//ENVOIE DES INFORMATIONS VIA LoRa
@@ -616,21 +521,15 @@ void loop()
 		
 		if(Serial)
 		{
-			Serial.println("");
-			Serial.println(".");
-			Serial.println("");
 			Serial.println("*****************************************************");
 			Serial.println("Transmission des données via LoRa (RF95)");
 			Serial.println("*****************************************************");
-			Serial.println("");
 		}
-		
-		if(Serial){Serial.println("Initialisation du LoRa RF95...");}
 		
 		//Activation du LoRa
 		if (!rf95.init())
 		{
-			if(Serial){Serial.println("Erreur lors de l'initialisation du LoRa (FR95) :(");}
+			if(Serial){Serial.println("Erreur lors de l'initialisation du LoRa (FR95)");}
 		}
 		else
 		{
@@ -641,24 +540,12 @@ void loop()
 		rf95.setTxPower(puissance_signal_LoRa);
 		rf95.setSignalBandwidth(bande_passante_LoRa);
 		
-		if(Serial){Serial.print("Attente de la disponibilité du cannal de transmission...");}
-		if(Serial){Serial.println("(Listen Before Talk ?)");}
-		
-		
-		if(Serial){Serial.println("Le canal libre! On envoie...");}
-		
-		/*
-			uint8_t dataX[50] = "XXXTESTdatasensors";
-			rf95.send(dataX, sizeof(dataX));
-		*/
-		
-		
-		
 		rf95.send((uint8_t *)buffer_a_envoyer, 1+strlen(buffer_a_envoyer)); 
 		//On attend que le packet ait bien été envoyé...
 		rf95.waitPacketSent();
 		Serial.println("Réussite: BUFFER(packet) envoyé via LoRa !!!");
 		
+    digitalWrite(13, HIGH);
 		
 		Serial.print("On écoute pendant ");
 		Serial.print(delai_reponse_LoRa);
@@ -688,12 +575,11 @@ void loop()
 				//On traite la réponse reçue via notre fonction de traitement de données recues
 				//analyse_datas_recues((char*)buf);
 				
+        digitalWrite(13, LOW);
 				//On verifie si le recepteur a bien recu notre réponse...
 				if (String((char*)buf) == SENSOR_ID)
 				{
 					Serial.println("CONFIRMATION OK : Le GATEWAY a bien reçu la réponse!!");
-					
-					delay(5000);
 				}
 				else
 				{
@@ -702,22 +588,19 @@ void loop()
 					//on attend une durée aléatoire avant de renvoyé!
 					duree_attente_aleatoire = random(1000,10000);
 					
-					Serial.print("on attent ");
+					Serial.print("on attend ");
 					Serial.print(duree_attente_aleatoire);
 					Serial.println("ms avant de re envoyé...");
 					
-					delay(duree_attente_aleatoire);
+          delay(duree_attente_aleatoire);
 					
 					Serial.println("On envoie...");
+          digitalWrite(13, HIGH);
 					rf95.send((uint8_t *)buffer_a_envoyer, 1+strlen(buffer_a_envoyer)); 
 					//On attend que le packet ait bien été envoyé...
 					rf95.waitPacketSent();
 					Serial.println("Le packet a été re-envoyé");
-					
-					
 				}
-				
-				
 				
 			}
 			else
@@ -729,8 +612,6 @@ void loop()
 		{
 			if(Serial){Serial.println("Aucune réponse...");}
 		}
-		
-		
 		
 		if(Serial)
 		{
@@ -745,45 +626,35 @@ void loop()
 		
 		//On coupe toute les alimentation
 		digitalWrite(13, LOW);
-		
-		//On attend la fréquence d'échantillonnage avant de relancer
-		//delay(frequence_echantillonnage*60*1000);
-		
-		
-		
+    //Alimentation(Vcc) du 1-Wire
+    digitalWrite(12, LOW);
+    //Alimentation(Vcc) du I²C
+    digitalWrite(11, LOW);
+    //Alimentation(Vcc) de l'analogique A4
+    digitalWrite(A4, LOW);    
+    //Alimentation(Vcc) de l'analogique A5
+    digitalWrite(A5, LOW);
 	}
 	else
 	{
 		//Le feather est en "veille" mais il écoute toujours qu'on appuie sur le btn du badging
-		
-		
-		
+
 		if(btn_click == true)
-		{
-			//on reste a cette étape pendant temps_btn_click secondes
-			
-			/*
-				Serial.print(compteur_btn_click);
-				Serial.print(" >= ");
-				Serial.print(temps_btn_click);
-				
-				Serial.println(" >= ");
-			*/
-			
+		{			
 			if(millis() >= compteur_end_btn_click)
 			{
-				//fin de décomte
-				
+        //Alimentation(Vcc) du 1-Wire
+        digitalWrite(12, LOW);
+				//fin de décompte				
 				Serial.println("FIN DE LA LECTURE...");
-				
-				digitalWrite(13, LOW);
-				
 				btn_click=false;
 			}
 			else
 			{
+        //Alimentation(Vcc) du 1-Wire
+        digitalWrite(12, HIGH);
+        delay(100);
 				//on lit la valeur du RFID eventuelle
-				
 				
 				byte i;
 				byte present = 0;
@@ -799,59 +670,25 @@ void loop()
 						if(Serial){Serial.println("Recherche terminée");}
 						
 						ds.reset_search();
-						delay(2500);
-						
-						return;
 					*/
 				}
 				else
 				{
 					
-					
-					//On récrit dans la variable du buffer
-					snprintf(buffer_a_envoyer, SIZE_BUFFER, "G=");
-					
-					//Serial.print("ROM =");
-					for( i = 0; i < 8; i++) {
-						//Serial.write(' ');
-						if ( addr[i]<16) {
-							// Serial.print("0");
-							
-						}
-						//if(Serial){Serial.print(addr[i], HEX);}
-						
-						//le "moins" permet d'écrire à gauche
-						dtostrf(addr[i], -0, 0, v1_string);
-						
-						//On récrit dans la variable du buffer
-						snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s%s", buffer_a_envoyer, v1_string);
-						
-					}
-					
-					if (OneWire::crc8(addr, 7) != addr[7]) {
-						if(Serial){Serial.println("CRC invalide!");}
-						return;
-					}
-					
-					
-					
-					
-					
-					
 					switch (addr[0]) {
 						
 						//Si carte RFID DETECTé
 						case 0x01:
+            digitalWrite(13, HIGH);
 						if(Serial){Serial.println("DS1990 DS2401");}
+            //On récrit dans la variable du buffer
+            snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&G=", buffer_a_envoyer);
+            for( i = 1; i <= 6; i++) {
+              snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s%02x", buffer_a_envoyer, addr[i]);
+            }
 						compteur_end_btn_click=millis();
 						
 						Serial.println("ON ENVOIE VIA LoRa COMME QUOI LE BADGE A ETE DETECTER");
-						
-						
-						
-						//On récrit dans la variable du buffer
-						snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&%s", SENSOR_ID, buffer_a_envoyer);
-						
 						
 						Serial.println(buffer_a_envoyer);
 						
@@ -903,7 +740,7 @@ void loop()
 						//On attend que le packet ait bien été envoyé...
 						rf95.waitPacketSent();
 						Serial.println("Réussite: BUFFER(packet) envoyé via LoRa !!!");
-						
+            digitalWrite(13, LOW);
 						
 						Serial.print("On écoute pendant ");
 						Serial.print(delai_reponse_LoRa);
@@ -937,11 +774,10 @@ void loop()
 								if (String((char*)buf) == SENSOR_ID)
 								{
 									Serial.println("CONFIRMATION OK : Le GATEWAY a bien reçu la réponse!!");
-									
-									delay(5000);
 								}
 								else
 								{
+                  digitalWrite(13, HIGH);
 									Serial.println("Interférence avec un autre sensor donc on re envoie le message apres un delai aléatoire!");
 									
 									//on attend une durée aléatoire avant de renvoyé!
@@ -958,7 +794,8 @@ void loop()
 									//On attend que le packet ait bien été envoyé...
 									rf95.waitPacketSent();
 									Serial.println("Le packet a été re-envoyé");
-									
+   		            digitalWrite(13, LOW);
+
 									
 								}
 								
@@ -974,18 +811,8 @@ void loop()
 						{
 							if(Serial){Serial.println("Aucune réponse...");}
 						}
-						
-						
-						
-						
-						
-						
-						
-						
+            digitalWrite(13, LOW);
 						break;
-						
-						
-						return;
 					} 
 					
 					
@@ -999,16 +826,7 @@ void loop()
 				
 			}
 			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
+						
 		}
 		else
 		{

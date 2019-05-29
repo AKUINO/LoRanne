@@ -43,7 +43,11 @@ Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 #define RFM95_CS      14  //
 #define RFM95_INT     32   //  next to A
 
-
+// Relays...
+#define SET_R1 A0
+#define UNSET_R1 A1
+#define UNSET_R2 A5
+#define SET_R2 21
 
 ///////////////////////////////////////
 //Déclaration des variables
@@ -151,6 +155,11 @@ char URL_HTTPS[200];
 
 String URL;
 
+void pulse (uint8_t pin) {
+  digitalWrite(pin,HIGH);
+  delay(100);
+  digitalWrite(pin,LOW);
+}
 
 void setup(){
     Serial.begin(9600);
@@ -168,11 +177,21 @@ void setup(){
 	// Since the buffer is intialized with an Adafruit splashscreen
 	// internally, this will display the splashscreen.
 	display.display();
-	delay(1000);
 	
-	
-	Serial.println("IO test");
-	
+  pinMode(SET_R1, OUTPUT);
+  digitalWrite(SET_R1, LOW);
+  
+  pinMode(UNSET_R1, OUTPUT);
+  digitalWrite(UNSET_R1, LOW);
+  pulse(UNSET_R1);
+  
+  pinMode(SET_R2, OUTPUT);
+  digitalWrite(SET_R2, LOW);
+
+  pinMode(UNSET_R2, OUTPUT);
+  digitalWrite(UNSET_R2, LOW);
+  pulse(UNSET_R2);
+  
 	pinMode(BUTTON_A, INPUT_PULLUP);
 	pinMode(BUTTON_B, INPUT_PULLUP);
 	pinMode(BUTTON_C, INPUT_PULLUP);
@@ -198,25 +217,9 @@ void setup(){
 	
 	//////////////////////////
 	
+  Serial.println("Initialisation du LoRa...");
 	pinMode(RFM95_RST, OUTPUT);
-	digitalWrite(RFM95_RST, HIGH);
-	
-	Serial.begin(9600);
-	
-	/*
-		while (!Serial) {
-		delay(1);
-		}
-	*/
-	
-	delay(100);
-	
-	
-	
-	Serial.println("Initialisation du LoRa...");
-	
-	// manual reset
-	digitalWrite(RFM95_RST, LOW);
+	pulse(RFM95_RST);
 	delay(10);
 	digitalWrite(RFM95_RST, HIGH);
 	delay(10);
@@ -227,22 +230,13 @@ void setup(){
 	}
 	Serial.println("LoRa radio init OK!");
 	
-	
 	rf95.setFrequency(frequence_LoRa);
 	rf95.setTxPower(puissance_signal_LoRa);
 	rf95.setSignalBandwidth(bande_passante_LoRa);
 	
 	delay(1000);
-	
-	
-	
-	
-	
-	
-	
-	
-    
-    if(!SD.begin(33)){
+	  
+  if(!SD.begin(33)){
         Serial.println("Card Mount Failed");
         return;
 	}
@@ -312,6 +306,11 @@ void setup(){
 	
 }
 
+
+String buffer_recu;
+
+String ID_recu;
+
 void loop()
 {
 	
@@ -333,23 +332,36 @@ void loop()
 			Serial.println((char*)buf);
 			Serial.print("RSSI: ");
 			Serial.println(rf95.lastRssi(), DEC);
-			
-			
+
+			//On envoie les données sur le serveur HTTP
 			
 			
 			//On envoie les données sur le serveur HTTP
 			
 			
-			
-			
-			
+			buffer_recu=String((char*)buf);
+
+		  ID_recu=buffer_recu.substring(0, 3);
+
+
+			Serial.print("Envoie d'une réponse à ");
+			Serial.println(ID_recu);
+
+			char copy[4];
+			ID_recu.toCharArray(copy, 4);
+			rf95.send((uint8_t*)copy, sizeof(copy)); 
+			rf95.waitPacketSent();
+
+		      	Serial.println("Réponse envoyé!");
+      
+	
 			display.clearDisplay();
 			display.display();
 			// text display tests
 			display.setTextSize(1);
 			display.setTextColor(WHITE);
 			display.setCursor(0,0);
-			display.println("MESSAGE RECU :");
+			//display.println("MESSAGE RECU :");
 			display.print((char*)buf);
 			display.setCursor(0,0);
 			display.display(); // actually display all of the above
@@ -360,72 +372,16 @@ void loop()
 			
 			
 			
-			//const char* host = "192.168.1.43";
-			
-			const char* host = "192.168.43.138";
 			unsigned long timeout = millis();
 			WiFiClient client;
 			const int httpPort = 80;
-			
-			snprintf(URL_HTTPS, SIZE_URL_HTTPS, "http://192.168.43.138/AKUINO_Dashboard/app/reception.php?v=-%u&%s", RSSI_SENSOR, (char*)buf);
-			
-			Serial.println(URL_HTTPS);
-			
-			
-			
-			URL=String(URL_HTTPS);
-			
-			//Adaptation du format de l'url pour mon serveur (dashboard personalisé)
-			
-			
-			URL.replace("R=", "");
-			URL.replace("&M=", "/");
-			URL.replace("&B=", "/");
-			URL.replace("&", "/");
-			
-            // Use WiFiClient class to create TCP connections
-			
-			
-			
-			/*
-				if (!client.connect(host, httpPort)) {
-				Serial.println("http connection failed");
-				return;
-				}
-				
-				Serial.print("Requesting URL: ");
-				Serial.println(URL_HTTPS);
-				
-				// This will send the request to the server
-				client.print(String("GET ") + URL + " HTTP/1.1\r\n" +
-				"Host: " + host + "\r\n" +
-				"Connection: close\r\n\r\n");
-				
-				while (client.available() == 0) {
-				if (millis() - timeout > 5000) {
-				Serial.println(">>> Client Timeout !");
-				client.stop();
-				return;
-				}
-				}
-				
-				// Read all the lines of the reply from server and print them to Serial
-				while(client.available()) {
-				String line = client.readStringUntil('\r');
-				Serial.print(line);
-				}
-				
-				
-			*/
-			
-			
 			
 			///////////////////////////////////////////
 			//On envoie au serveur ELSA
 			//////////////////////////////////////////
 			
 			
-			host = "phenics.gembloux.ulg.ac.be";
+			char * host = "phenics.gembloux.ulg.ac.be";
 			
 			snprintf(URL_HTTPS, SIZE_URL_HTTPS, "/api/kv?R=-%u&%s", RSSI_SENSOR, (char*)buf);
 			
@@ -462,7 +418,52 @@ void loop()
 			// Read all the lines of the reply from server and print them to Serial
 			while(client.available()) {
 				String line = client.readStringUntil('\r');
-				Serial.print(line);
+        //Serial.print(line.length());
+        //Serial.print("=");
+				Serial.println(line);
+        int posM = line.indexOf(String("&M=25"));
+        //Serial.print("M=");
+        //Serial.print(posM);
+        if (posM >= 0 && posM+5 < line.length()) {
+          unsigned char c = line.charAt(posM+5);
+          if (c >= '0' && c <= '4') {
+            line = line.substring(posM+5);
+            int posR = line.indexOf(String("&R"));
+            //Serial.print(",R=");
+            //Serial.print(posR);
+            if (posR >= 0 && (posR+5) < line.length() && line.charAt(posR+3)=='=') {
+              c = line.charAt(posR+2);
+              boolean d = (line.charAt(posR+4)=='1');
+              //Serial.print(",C=");
+              //Serial.print(c);
+              //Serial.print(",D=");
+              //Serial.print(d);
+              
+              if (c >= '1' && c <= '2') {
+                if (c=='1') {
+                  Serial.print ("Relay 1: ");
+                  if (d) {
+                    pulse(SET_R1);
+                    Serial.println("SET");
+                  } else {
+                    pulse(UNSET_R1);
+                    Serial.println("unset");
+                  }
+                } else if (c=='2') {
+                  Serial.print ("Relay 2: ");
+                  if (d) {
+                    pulse(SET_R2);
+                    Serial.println("SET");
+                  } else {
+                    pulse(UNSET_R2);
+                    Serial.println("unset");
+                  }
+                }
+             }
+            }
+          }
+        }
+        Serial.println();
 			}
 			
 			
@@ -471,10 +472,8 @@ void loop()
 			
 			
 			//
-			//On écrit sur la carte SD
-			
-			
-			//    appendFile(SD, "/sauvegarde.txt", (char*)buf);
+			//On écrit sur la carte SD		
+	    appendFile(SD, "/lora.txt", (char*)buf);
 			
 			/*
 				// Send a reply
