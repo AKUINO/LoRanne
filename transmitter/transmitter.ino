@@ -12,7 +12,7 @@ Programme de check-up + envoie des données sur le GateWay via LoRa
 
 
 //id du sensor
-char SENSOR_ID[]="M=5";
+char SENSOR_ID[]="M=2";
 
 #include <Wire.h>
 #include <OneWire.h>
@@ -130,7 +130,7 @@ void setup()
 	pinMode(A5, OUTPUT);
   digitalWrite(A5,LOW);
 	
-	#define VBATPIN A6
+	#define VBATPIN A7
 		
   Serial1.begin(9600);
 
@@ -405,7 +405,7 @@ void loop()
 		byte addr[12];
 		
 		
-		
+		delay(100);
 		if ( !ds.search(addr))
 		{
 			if(Serial){Serial.println("Aucune One-Wire detecté ! :(");}
