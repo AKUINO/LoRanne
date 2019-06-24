@@ -76,9 +76,10 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 	const char* password = "yTre5QK4pP35";
 */
 
-const char* ssid     = "AndroidAP";
-const char* password = "badrdibdib";
-
+//const char* ssid     = "AndroidAP";
+//const char* password = "badrdibdib";
+const char* ssid     = "TP-LINK_1BFC";
+const char* password = "59384748";
 
 const char*  server = "http://phenics.gembloux.ulg.ac.be";  // Server URL
 
