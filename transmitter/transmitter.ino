@@ -1,40 +1,41 @@
 /*
-          _          _                   _____                           
-    /\   | |        (_)                 / ____|                          
-   /  \  | | ___   _ _ _ __   ___ _____| (___   ___ _ __  ___  ___  _ __ 
+          _          _                   _____
+    /\   | |        (_)                 / ____|
+   /  \  | | ___   _ _ _ __   ___ _____| (___   ___ _ __  ___  ___  _ __
   / /\ \ | |/ / | | | | '_ \ / _ \______\___ \ / _ \ '_ \/ __|/ _ \| '__|
- / ____ \|   <| |_| | | | | | (_) |     ____) |  __/ | | \__ \ (_) | |   
-/_/    \_\_|\_\\__,_|_|_| |_|\___/     |_____/ \___|_| |_|___/\___/|_|   
+ / ____ \|   <| |_| | | | | | (_) |     ____) |  __/ | | \__ \ (_) | |
+/_/    \_\_|\_\\__,_|_|_| |_|\___/     |_____/ \___|_| |_|___/\___/|_|
 
 Programme de check-up + envoie des données sur le GateWay via LoRa
 
 */
-
-
-//id du sensor
-char SENSOR_ID[]="M=2";
+uint8_t SENSOR_ID = 4;
 
 #include <Wire.h>
 #include <OneWire.h>
 #include <SPI.h>
+//#include <QueueList.h>
 #include <avr/dtostrf.h>
 #include "Adafruit_SHT31.h"
+#include "FIFO.h"
+#include "pt.h"
 
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
 #include <RH_RF95.h>
-RH_RF95 rf95(8, 3);
-
-
+uint8_t slaveSelectPin = 8, interruptPin = 3;
+RH_RF95 radioDriver(slaveSelectPin, interruptPin);
+#include <RHReliableDatagram.h>
+uint8_t datagramAddress = 253;
+RHReliableDatagram rhRDatagram(radioDriver, datagramAddress);
 
 /////////////////////////////
 //Déclaration des sorties
 /////////////////////////////
 
 //Sortie du 1-Wire
-OneWire  ds(5);
-
-
+int oneWireOutput = 5;
+OneWire  ds(oneWireOutput);
 
 ///////////////////////////////////////
 //Déclaration des variables
@@ -46,912 +47,654 @@ float bande_passante_LoRa = 62500;
 //Puissance utilisée (par defaut : 10 mW)
 float puissance_signal_LoRa = 10;
 
-//Fréquence d'échantillonnage en min (par defaut : 15min)
-float frequence_echantillonnage = 0.1;
-
-
 //Compteur de millisecondes pour vérifier le système de badge
-unsigned long previousMillis=0 ;
-unsigned long interval = frequence_echantillonnage*60*10000;
-
-//int frequence_echantillonnage = 1;
-
-//Délai d'attente d'une réponse LoRa (par defaut : 5 secondes)
-int delai_reponse_LoRa = 5;
-
+unsigned long previousMillis=0;
 //Taille FIXE Maximale du buffer d'envoi LoRa
 uint8_t SIZE_BUFFER = 100;
-//Variable a envoyer via LoRa
-char buffer_a_envoyer[100];
+uint32_t compteur = 0;
+//QueueList <char> queue;
+FIFO sensorFIFO;
+#define ledPin 13
+#define v_OneWire 12
+#define v_I2C 11
+#define v_Analog1 A4
+#define v_Analog2 A5
+static struct pt sensorAnalysisPT, sendingPT, receivingPT;
+int tmpQueueSize = 0;
+uint8_t tmpBuffer[100];
 
-//pourcentage de la batterie
-float SENSOR_BATTERY;
-
-
-
-int pinA0=0; 
-int pinA1=0; 
-int pinA2=0; 
-
-
-uint32_t compteur=0;
-
-long duree_attente_aleatoire;
-
-//Pour la gestion du bouton
-boolean btn_click=false;
-//temps pour la lecture du RFID apres avoir appuyé sur le btn
-int temps_btn_click=10*1000;
-unsigned long compteur_btn_click;
-
-unsigned long compteur_begin_btn_click;
-unsigned long compteur_end_btn_click;
-
-
-
-
-void setup()
-{
-	delay(1000);
-	
-	Serial.begin(9600);
-	Serial.println('Hello!');
-  delay(1000);
-	
-	
-	//On vide le buffer_a_envoyer
-	memset(buffer_a_envoyer, 0, sizeof(buffer_a_envoyer));
-	
-	//Alimentation(Vcc) de la LED
-	pinMode(13, OUTPUT);
-  digitalWrite(13,HIGH);
-	
-	//Alimentation(Vcc) du 1-Wire
-	pinMode(12, OUTPUT);  
-  digitalWrite(12,LOW);
-	
-	//Alimentation(Vcc) du I²C
-	pinMode(11, OUTPUT);
-  digitalWrite(11,LOW);
-	
-  pinMode(6, OUTPUT);
-  digitalWrite(6,HIGH);
-  
-	pinMode(A0, INPUT_PULLDOWN);
-
-  //Necessary for Door Open/Close detection
-  pinMode(A2, INPUT_PULLUP);
-	
-	//Alimentation(Vcc) de l'analogique A4
-	pinMode(A4, OUTPUT);
-  digitalWrite(A4,LOW);
-	
-	//Alimentation(Vcc) de l'analogique A5
-	pinMode(A5, OUTPUT);
-  digitalWrite(A5,LOW);
-	
-	#define VBATPIN A7
-		
-  Serial1.begin(9600);
-
-  delay(100);
-  digitalWrite(13,LOW);
+void setup() {
+  //Alimentation(Vcc) de la LED
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+  //Alimentation(Vcc) du 1-Wire
+  pinMode(v_OneWire, OUTPUT);
+  digitalWrite(v_OneWire, LOW);
+  //Alimentation(Vcc) du I²C
+  pinMode(v_I2C, OUTPUT);
+  digitalWrite(v_I2C, LOW);
+  //Alimentation(Vcc) de l'analogique A4
+  pinMode(v_Analog1, OUTPUT);
+  digitalWrite(v_Analog1, LOW);
+  //Alimentation(Vcc) de l'analogique A5
+  pinMode(v_Analog2, OUTPUT);
+  digitalWrite(v_Analog2, LOW);
+  //On démarre le 1-Wire
+  Wire.begin();
+  #define VBATPIN A7
+  PT_INIT(&sensorAnalysisPT);
+  PT_INIT(&sendingPT);
+  PT_INIT(&receivingPT);
+  if(Serial) {
+    //On allume la LED car on est connecté au serial (mode debug)
+    digitalWrite(ledPin, HIGH);
+    Serial.println("########################################");
+    Serial.println("########## Akuino Sensor v17 ##########");
+    Serial.println("########################################");
+    Serial.print(millis());
+    Serial.print(";D;Fréquence:");
+    Serial.print(frequence_LoRa);
+    Serial.print("MHz");
+    Serial.print(";Bande passante=");
+    Serial.print(bande_passante_LoRa);
+    Serial.print("KHz");
+    Serial.print(";Puissance=");
+    Serial.print(puissance_signal_LoRa);
+    Serial.print("mW");
+    Serial.print(";ID=" );
+    Serial.println(SENSOR_ID);
+  }
 }
 
+void loop() {
+  Serial.begin(115200);
+  Serial1.begin(115200);
+  delay(2500);
+  //Fréquence d'échantillonnage en min (par defaut : 15min)
+  float periode_echantillon = 6; // in seconds
 
-long blinkMilli = 0;
+  sensorAnalysis(&sensorAnalysisPT);
+  loRaSending(&sendingPT);
+  receiving(&receivingPT);
 
-void loop()
-{
-			
-	//Variable utilisée pour la récriture du buffer_a_envoyer
-	char v1_string[5];
-	
-	if( millis() - previousMillis >= interval)
-	{
-		previousMillis = millis(); 
-		
-		
-    digitalWrite(13, HIGH);
-
-		////////////////////////////////////
-		//Récupération du niveau de batterie
-		////////////////////////////////////
-		float measuredvbat = analogRead(VBATPIN);
-		measuredvbat *= 2;    // we divided by 2, so multiply back
-		measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
-		measuredvbat /= 1024; // convert to voltage
-		SENSOR_BATTERY=measuredvbat;
-		
-
-		
-			
-		
-		//On écrit le header(en-tête) du buffer_a_envoyer + Niveau de batterie
-		
-		//le "moins" permet d'écrire à gauche
-		dtostrf(SENSOR_BATTERY, -5, 3, v1_string);
-		
-		snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&B=%s", SENSOR_ID, v1_string);
-		
-		
-		if(Serial)
-		{
-			
-			Serial.println("########################################");
-			Serial.println("########## Akuino Sensor v1.0 ##########");
-			Serial.println("########################################");
-			Serial.print("Fréquence: ");
-			Serial.print(frequence_LoRa);
-			Serial.print(" MHz");
-			Serial.println("");
-			Serial.print("Bande passante : ");
-			Serial.print(bande_passante_LoRa);
-			Serial.print(" KHz");
-			Serial.println("");
-			Serial.print("Puissance : ");
-			Serial.print(puissance_signal_LoRa);
-			Serial.print(" mW");
-			Serial.println("");
-			Serial.print("Niveau de Batterie : " );
-			Serial.print(SENSOR_BATTERY);
-			Serial.println(" Volt");
-			Serial.print("ID : " );
-			Serial.println(SENSOR_ID);
-			Serial.println("########################################");
-			Serial.println("");
-			
-		}//end if
-		
-		
-		/////////////////////////////////////////////
-		//On alimente toutes les sorties du transitor
-		
-		//Alimentation(Vcc) du 1-Wire
-		digitalWrite(12, HIGH);
-		
-		//Alimentation(Vcc) du I²C
-		digitalWrite(11, HIGH);
-		
-		//Alimentation(Vcc) de l'analogique A4
-		digitalWrite(A4, HIGH);
-		
-		//Alimentation(Vcc) de l'analogique A5
-		digitalWrite(A5, HIGH);
-		
-		//On démarre le 1-Wire
-		Wire.begin();
-		
-		
-		////////////////////////////////////////////////
-		//Test du port série
-		////////////////////////////////////////////////
-		if(Serial)
-		{
-			Serial.println("**********************************************************");
-			Serial.println("Test du port série...");
-			Serial.println("**********************************************************");
-      Serial1.println("TEST PORT SERIE");
-      Serial.println("Données envoyées!");
-		}
-		
-		
-		////////////////////////////////////////////////
-		//Analyse et lecture des analogiques disponibles
-		////////////////////////////////////////////////
-    pinA0=digitalRead(A0);
-    pinA1=analogRead(A1);
-    //pinA2=analogRead(A2);
-    pinA2=digitalRead(A2);
-
-		if(Serial)
-		{
-			Serial.println("**********************************************************");
-			Serial.println("Analyse et lecture des analogiques disponibles en cours...");
-			Serial.println("**********************************************************");
-      Serial.print("PIN_A0 = ");
-      Serial.println(pinA0);
-      
-      Serial.print("PIN_A1 = ");
-      Serial.println(pinA1);
-  
-      Serial.print("PIN_A2 = ");
-      Serial.println(pinA2);
-		}
-		
-		//On écrit
-		//le "moins" permet d'écrire à gauche
-		dtostrf(pinA0, -1, 0, v1_string);
-		
-		//On récrit dans la variable du buffer
-		snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&A0=%s", buffer_a_envoyer, v1_string);
-		
-        //On écrit
-		//le "moins" permet d'écrire à gauche
-		dtostrf(pinA1, -1, 0, v1_string);
-		
-		//On récrit dans la variable du buffer
-		snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&A1=%s", buffer_a_envoyer, v1_string);
-		
-		//On écrit
-		//le "moins" permet d'écrire à gauche
-		dtostrf(pinA2, -1, 0, v1_string);
-		
-		//On récrit dans la variable du buffer
-		snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&A2=%s", buffer_a_envoyer, v1_string);
-		
-		
-		/////////////////////////////////////////
-		//Analyse et lecture des I²C disponibles
-		////////////////////////////////////////
-		
-		byte error, address;
-		int nDevices;
-		float fonction_return_value;
-		
-		if(Serial)
-		{
-			Serial.println("***************************************************");
-			Serial.println("Analyse et lectures des I²c disponibles en cours...");
-			Serial.println("***************************************************");
-		}
-		
-		nDevices = 0;
-		//for(address = 1; address < 127; address++ ) 
-    address = 0x44;
-		{
-			/* REMARQUE :
-				* Le scanner utilise la valeur de retour de Write.endTransmisstion
-				* pour voir si un périphérique a émit un accusé réception de l'adresse
-			*/
-			Wire.beginTransmission(address);
-			error = Wire.endTransmission();
-			
-			if (error == 0)
-			{
-				if(Serial)
-				{
-					Serial.print("Un dispositif(device) I²C a été trouvé à l'adresse 0x");
-      					Serial.println(address,HEX);
-				}
-				
-				nDevices++;
-				
-				
-				//////////////////////////////////
-				//SHT31 : Température et humidité
-				//Adresse I²C: 0x44
-				/////////////////////////////////
-				
-				if(address == 0x44) //Adresse en Hexadécimal
-				{
-					
-					
-					if(Serial){Serial.println("Capteur SHT31 (Température+humidité) detecté! Connexion...");}
-					if (! sht31.begin(0x44)) {
-						Serial.println("Erreur lors de la connexion à ce capteur! :(");
-					}
-					else
-					{
-						//on lit les informations de ce capteur
-						
-						float t = sht31.readTemperature();
-						float h = sht31.readHumidity();
-						
-						if (! isnan(t)) {  // check if 'is not a number'
-							Serial.print("Température en °C = "); Serial.println(t);
-							} else { 
-							Serial.println("Erreur lors de la lecture de la température");
-						}
-						
-						if (! isnan(h)) {  // check if 'is not a number'
-							Serial.print("Humidité en % = "); Serial.println(h);
-							} else { 
-							Serial.println("Erreur lors de la lecture de l'humidité!");
-						}
-						
-						
-						//le "moins" permet d'écrire à gauche
-						dtostrf(t, -5, 3, v1_string);
-						
-						//On récrit dans la variable du buffer
-						snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&C1=%s", buffer_a_envoyer, v1_string);
-						
-						
-						//le "moins" permet d'écrire à gauche
-						dtostrf(h, -5, 3, v1_string);
-						
-						//On récrit dans la variable du buffer
-						snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&H1=%s", buffer_a_envoyer, v1_string);
-						
-						
-						
-					}
-					
-				}
-			}
-			else if (error==4) 
-			{
-				if(Serial){
-				  Serial.print("Erreur inconnue à l'adresse 0x");
-					Serial.println(address,HEX);
-				}
-				
-			}    
-		}
-    if (Serial) {
-      if (nDevices == 0) {
-        Serial.println("Aucun dispositif(device) n'a été trouvé!");
-      } else {
-        Serial.println("Analyse du I²C terminée!");
-      }
-    }
-			
-		
-		///////////////////////////////////////////////////////
-		//Analyse et lecture des 1-Wire disponibles en cours...
-		///////////////////////////////////////////////////////
-		
-		if(Serial)
-		{
-			Serial.println("*****************************************************");
-			Serial.println("Analyse et lecture des 1-Wire disponibles en cours...");
-			Serial.println("*****************************************************");
-		}
-		
-		byte i;
-		byte present = 0;
-		byte data[12];
-		byte addr[12];
-		
-		
-		delay(100);
-		if ( !ds.search(addr))
-		{
-			if(Serial){Serial.println("Aucune One-Wire detecté ! :(");}
-			/*
-				if(Serial){Serial.println("Recherche terminée");}
-				
-				ds.reset_search();
-			*/
-		}
-		else
-		{
-			
-			if(Serial)
-			{
-				Serial.print("CHIP ");
-				Serial.print(addr[0],HEX);
-				//Le premier octet (ROM) indique quelle est le chip (dipositif)
-				Serial.print(" = ");
-			}
-			
-			switch (addr[0]) {
-				
-				case 0x01:
-				if(Serial){Serial.println("DS1990 DS2401");}
-        //On récrit dans la variable du buffer
-        snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&G=", buffer_a_envoyer);
-        for( i = 1; i <= 6; i++) {
-          snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s%02x", buffer_a_envoyer, addr[i]);
-        }
-				break;
-
-				case 0x02:
-				if(Serial){Serial.println("DS1991");}
-				break;
-				case 0x04:
-				if(Serial){Serial.println("DS1994");} 
-				break;
-				case 0x05:
-				if(Serial){Serial.println("DS2405");}
-				break;
-				case 0x06:
-				if(Serial){Serial.println("DS1992");} 
-				break;
-				case 0x08:
-				if(Serial){Serial.println("DS1993");}
-				break;
-				case 0x0B:
-				if(Serial){Serial.println("DS1985");} 
-				break;
-				case 0x10:
-				if(Serial){Serial.println("DS1820 DS18S20 DS1920");} 
-				break;
-				case 0x12:
-				if(Serial){Serial.println("DS2406");} 
-				break;
-				case 0x21:
-				if(Serial){Serial.println("DS1921");}
-				break;
-				case 0x22:
-				if(Serial){Serial.println("DS1822");}
-				break;
-				case 0x24:
-				if(Serial){Serial.println("DS1904");}
-				break;
-				case 0x28:
-				if(Serial){Serial.println("DS18B20");}
-				
-				if(Serial){Serial.println("Lecture des données de ce chip...");}
-				
-				//On appelle la fonction pour la lecture
-				fonction_return_value = lecture_DS18B20(addr);
-				
-				//le "moins" permet d'écrire à gauche
-				dtostrf(fonction_return_value, -5, 3, v1_string);
-				
-				//On récrit dans la variable du buffer
-				snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&C2=%s", buffer_a_envoyer, v1_string);
-				
-				break;
-				case 0x29:
-				if(Serial){Serial.println("DS2408");}  
-				break;
-				case 0x36:
-				if(Serial){Serial.println("DS2740");}
-				break;
-				case 0x3B:
-				if(Serial){Serial.println("DS1825");}  
-				break;
-				case 0x41:
-				if(Serial){Serial.println("DS1923");} 
-				break;
-				
-				default:
-				if(Serial){Serial.println(" n'est pas répertorié.");}
-				
-			} 
-			
-			
-		}
-		
-		if(Serial)
-		{
-			Serial.println("----------------------------------------------- FIN DES SCANS -----------------------------------------------");
-			Serial.print("BUFFER qu'on doit envoyer au Gateway via LoRa ");
-			Serial.print(buffer_a_envoyer);
-		}
-				
-    digitalWrite(13, LOW);
-		
-		//////////////////////////////////
-		//ENVOIE DES INFORMATIONS VIA LoRa
-		//////////////////////////////////
-		
-		if(Serial)
-		{
-			Serial.println("*****************************************************");
-			Serial.println("Transmission des données via LoRa (RF95)");
-			Serial.println("*****************************************************");
-		}
-		
-		//Activation du LoRa
-		if (!rf95.init())
-		{
-			if(Serial){Serial.println("Erreur lors de l'initialisation du LoRa (FR95)");}
-		}
-		else
-		{
-			if(Serial){Serial.println("Initialisation réussie du LoRa (FR95)!");}
-		}
-		
-		rf95.setFrequency(frequence_LoRa);
-		rf95.setTxPower(puissance_signal_LoRa);
-		rf95.setSignalBandwidth(bande_passante_LoRa);
-		
-		rf95.send((uint8_t *)buffer_a_envoyer, 1+strlen(buffer_a_envoyer)); 
-		//On attend que le packet ait bien été envoyé...
-		rf95.waitPacketSent();
-		Serial.println("Réussite: BUFFER(packet) envoyé via LoRa !!!");
-		
-    digitalWrite(13, HIGH);
-		
-		Serial.print("On écoute pendant ");
-		Serial.print(delai_reponse_LoRa);
-		Serial.println(" seconde(s) si on reçoit une éventuelle réponse de notre GateWay...");
-		
-		// Maintenant, on attend une éventuelle réponse de notre GateWay
-		uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-		uint8_t len = sizeof(buf);
-		
-		if (rf95.waitAvailableTimeout(delai_reponse_LoRa*1000))
-		{ 
-			// Should be a reply message for us now   
-			if (rf95.recv(buf, &len))
-			{
-				if(Serial)
-				{
-					Serial.print("Réponse recue : ");
-					Serial.println((char*)buf);
-					Serial.print("RSSI: ");
-					Serial.println(rf95.lastRssi(), DEC); 
-				}
-				
-				
-				//On vide le buffer_a_envoyer car il a bien été recu...
-				//memset(buffer_a_envoyer, 0, sizeof(buffer_a_envoyer));
-				
-				//On traite la réponse reçue via notre fonction de traitement de données recues
-				//analyse_datas_recues((char*)buf);
-				
-        digitalWrite(13, LOW);
-				//On verifie si le recepteur a bien recu notre réponse...
-				if (String((char*)buf) == SENSOR_ID)
-				{
-					Serial.println("CONFIRMATION OK : Le GATEWAY a bien reçu la réponse!!");
-				}
-				else
-				{
-					Serial.println("Interférence avec un autre sensor donc on re envoie le message apres un delai aléatoire!");
-					
-					//on attend une durée aléatoire avant de renvoyé!
-					duree_attente_aleatoire = random(1000,10000);
-					
-					Serial.print("on attend ");
-					Serial.print(duree_attente_aleatoire);
-					Serial.println("ms avant de re envoyé...");
-					
-          delay(duree_attente_aleatoire);
-					
-					Serial.println("On envoie...");
-          digitalWrite(13, HIGH);
-					rf95.send((uint8_t *)buffer_a_envoyer, 1+strlen(buffer_a_envoyer)); 
-					//On attend que le packet ait bien été envoyé...
-					rf95.waitPacketSent();
-					Serial.println("Le packet a été re-envoyé");
-				}
-				
-			}
-			else
-			{
-				if(Serial){Serial.println("Problème lors de l'écoute...!! :(");}
-			}
-		}
-		else
-		{
-			if(Serial){Serial.println("Aucune réponse...");}
-		}
-		
-		if(Serial)
-		{
-			Serial.println(""); 
-			Serial.println("---------------------------------------------");
-			Serial.print("Le feather se met en repos(sommeil) pendant ");
-			Serial.print(frequence_echantillonnage);
-			Serial.print(" min...");
-			Serial.println("");
-			Serial.println("---------------------------------------------");
-		}
-		
-		//On coupe toute les alimentation
-		digitalWrite(13, LOW);
-    //Alimentation(Vcc) du 1-Wire
-    digitalWrite(12, LOW);
-    //Alimentation(Vcc) du I²C
-    digitalWrite(11, LOW);
-    //Alimentation(Vcc) de l'analogique A4
-    digitalWrite(A4, LOW);    
-    //Alimentation(Vcc) de l'analogique A5
-    digitalWrite(A5, LOW);
-	}
-	else
-	{
-		//Le feather est en "veille" mais il écoute toujours qu'on appuie sur le btn du badging
-
-		if(btn_click == true)
-		{			
-			if(millis() >= compteur_end_btn_click)
-			{
-        //Alimentation(Vcc) du 1-Wire
-        digitalWrite(12, LOW);
-				//fin de décompte				
-				Serial.println("FIN DE LA LECTURE...");
-				btn_click=false;
-			}
-			else
-			{
-        //Alimentation(Vcc) du 1-Wire
-        digitalWrite(12, HIGH);
-        delay(100);
-				//on lit la valeur du RFID eventuelle
-				
-				byte i;
-				byte present = 0;
-				byte data[12];
-				byte addr[8];
-				
-				
-				
-				if ( !ds.search(addr))
-				{
-					//if(Serial){Serial.println("Aucune One-Wire detecté ! :(");}
-					/*
-						if(Serial){Serial.println("Recherche terminée");}
-						
-						ds.reset_search();
-					*/
-				}
-				else
-				{
-					
-					switch (addr[0]) {
-						
-						//Si carte RFID DETECTé
-						case 0x01:
-            digitalWrite(13, HIGH);
-						if(Serial){Serial.println("DS1990 DS2401");}
-            //On récrit dans la variable du buffer
-            snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s&G=", buffer_a_envoyer);
-            for( i = 1; i <= 6; i++) {
-              snprintf(buffer_a_envoyer, SIZE_BUFFER, "%s%02x", buffer_a_envoyer, addr[i]);
-            }
-						compteur_end_btn_click=millis();
-						
-						Serial.println("ON ENVOIE VIA LoRa COMME QUOI LE BADGE A ETE DETECTER");
-						
-						Serial.println(buffer_a_envoyer);
-						
-						//////////////////////////////////
-						//ENVOIE DES INFORMATIONS VIA LoRa
-						//////////////////////////////////
-						
-						if(Serial)
-						{
-							Serial.println("");
-							Serial.println(".");
-							Serial.println("");
-							Serial.println("*****************************************************");
-							Serial.println("Transmission des données via LoRa (RF95)");
-							Serial.println("*****************************************************");
-							Serial.println("");
-						}
-						
-						if(Serial){Serial.println("Initialisation du LoRa RF95...");}
-						
-						//Activation du LoRa
-						if (!rf95.init())
-						{
-							if(Serial){Serial.println("Erreur lors de l'initialisation du LoRa (FR95) :(");}
-						}
-						else
-						{
-							if(Serial){Serial.println("Initialisation réussie du LoRa (FR95)!");}
-						}
-						
-						rf95.setFrequency(frequence_LoRa);
-						rf95.setTxPower(puissance_signal_LoRa);
-						rf95.setSignalBandwidth(bande_passante_LoRa);
-						
-						if(Serial){Serial.print("Attente de la disponibilité du cannal de transmission...");}
-						if(Serial){Serial.println("(Listen Before Talk ?)");}
-						
-						
-						if(Serial){Serial.println("Le canal libre! On envoie...");}
-						
-						/*
-							uint8_t dataX[50] = "XXXTESTdatasensors";
-							rf95.send(dataX, sizeof(dataX));
-						*/
-						
-						
-						
-						rf95.send((uint8_t *)buffer_a_envoyer, 1+strlen(buffer_a_envoyer)); 
-						//On attend que le packet ait bien été envoyé...
-						rf95.waitPacketSent();
-						Serial.println("Réussite: BUFFER(packet) envoyé via LoRa !!!");
-            digitalWrite(13, LOW);
-						
-						Serial.print("On écoute pendant ");
-						Serial.print(delai_reponse_LoRa);
-						Serial.println(" seconde(s) si on reçoit une éventuelle réponse de notre GateWay...");
-						
-						// Maintenant, on attend une éventuelle réponse de notre GateWay
-						uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-						uint8_t len = sizeof(buf);
-						
-						if (rf95.waitAvailableTimeout(delai_reponse_LoRa*1000))
-						{ 
-							// Should be a reply message for us now   
-							if (rf95.recv(buf, &len))
-							{
-								if(Serial)
-								{
-									Serial.print("Réponse recue : ");
-									Serial.println((char*)buf);
-									Serial.print("RSSI: ");
-									Serial.println(rf95.lastRssi(), DEC); 
-								}
-								
-								
-								//On vide le buffer_a_envoyer car il a bien été recu...
-								//memset(buffer_a_envoyer, 0, sizeof(buffer_a_envoyer));
-								
-								//On traite la réponse reçue via notre fonction de traitement de données recues
-								//analyse_datas_recues((char*)buf);
-								
-								//On verifie si le recepteur a bien recu notre réponse...
-								if (String((char*)buf) == SENSOR_ID)
-								{
-									Serial.println("CONFIRMATION OK : Le GATEWAY a bien reçu la réponse!!");
-								}
-								else
-								{
-                  digitalWrite(13, HIGH);
-									Serial.println("Interférence avec un autre sensor donc on re envoie le message apres un delai aléatoire!");
-									
-									//on attend une durée aléatoire avant de renvoyé!
-									duree_attente_aleatoire = random(1000,10000);
-									
-									Serial.print("on attent ");
-									Serial.print(duree_attente_aleatoire);
-									Serial.println("ms avant de re envoyé...");
-									
-									delay(duree_attente_aleatoire);
-									
-									Serial.println("On envoie...");
-									rf95.send((uint8_t *)buffer_a_envoyer, 1+strlen(buffer_a_envoyer)); 
-									//On attend que le packet ait bien été envoyé...
-									rf95.waitPacketSent();
-									Serial.println("Le packet a été re-envoyé");
-   		            digitalWrite(13, LOW);
-
-									
-								}
-								
-								
-								
-							}
-							else
-							{
-								if(Serial){Serial.println("Problème lors de l'écoute...!! :(");}
-							}
-						}
-						else
-						{
-							if(Serial){Serial.println("Aucune réponse...");}
-						}
-            digitalWrite(13, LOW);
-						break;
-					} 
-					
-					
-					
-					
-					
-				}
-				
-				
-				
-				
-			}
-			
-						
-		}
-		else
-		{
-			
-			//on lit
-			pinA0=digitalRead(A0);
-			
-			if(pinA0 == 1)
-			{
-				Serial.println("BTN CLICK, vous avez ");
-				Serial.print(temps_btn_click/1000);
-				Serial.println(" sec. pour faire passer la carte");
-				
-				btn_click=true;
-				
-				compteur_end_btn_click=millis()+temps_btn_click;
-				
-				digitalWrite(13, HIGH);
-				
-				//Pour allumer la LED du RFID
-				digitalWrite(6, LOW);
-				
-				
-			}
-			
-		}
-		
-		
-		
-	}
-	
-	
+  if(Serial) {
+    Serial.print(millis());
+    Serial.println(";D;Sleeping Microchip");
+  }
+  //On coupe toute les alimentation
+  digitalWrite(ledPin, LOW);
+  //On attend la fréquence d'échantillonnage avant de relancer
+  delay(periode_echantillon*1000); // PROTOTHREAD
+  compteur++;
+  //Serial.println(compteur);
 }
-
-
-
-
-
-
 
 ////////////////////////////////////////////////////////////////////////
 //Fonction pour la lecture de la température via le chip DS18B20 1-Wire
 ///////////////////////////////////////////////////////////////////////
 
-float lecture_DS18B20(byte addr[8])
-{
-	byte i;
-	byte present = 0;
-	byte type_s;
-	byte data[12];
-	float celsius, fahrenheit;
-	
-	ds.reset();
-	ds.select(addr);
-	ds.write(0x44, 1);        // start conversion, with parasite power on at the end
-	
-	delay(1000);     // maybe 750ms is enough, maybe not
-	// we might do a ds.depower() here, but the reset will take care of it.
-	
-	present = ds.reset();
-	ds.select(addr);    
-	ds.write(0xBE);         // Read Scratchpad
-	
-	Serial.print("  Data = ");
-	Serial.print(present, HEX);
-	Serial.print(" ");
-	for ( i = 0; i < 9; i++) {           // we need 9 bytes
-		data[i] = ds.read();
-		Serial.print(data[i], HEX);
-		Serial.print(" ");
-	}
-	Serial.print(" CRC=");
-	Serial.print(OneWire::crc8(data, 8), HEX);
-	Serial.println();
-	
-	// Convert the data to actual temperature
-	// because the result is a 16 bit signed integer, it should
-	// be stored to an "int16_t" type, which is always 16 bits
-	// even when compiled on a 32 bit processor.
-	int16_t raw = (data[1] << 8) | data[0];
-	if (type_s) {
-		raw = raw << 3; // 9 bit resolution default
-		if (data[7] == 0x10) {
-			// "count remain" gives full 12 bit resolution
-			raw = (raw & 0xFFF0) + 12 - data[6];
-		}
-		} else {
-		byte cfg = (data[4] & 0x60);
-		// at lower res, the low bits are undefined, so let's zero them
-		if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
-		else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
-		else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
-		//// default is 12 bit resolution, 750 ms conversion time
-	}
-	
-	celsius = (float)raw / 16.0;
-	fahrenheit = celsius * 1.8 + 32.0;
-	Serial.print("  Temperature = ");
-	Serial.print(celsius);
-	Serial.print(" Celsius, ");
-	Serial.print(fahrenheit);
-	Serial.println(" Fahrenheit");
-	
-	//on retourne la valeur du capteur
-	return(celsius);
-	
-}//end function
+float lecture_DS18B20(byte addr[8]) {
+  byte i;
+  byte present = 0;
+  byte type_s;
+  byte data[12];
+  float celsius, fahrenheit;
 
+  ds.reset();
+  ds.select(addr);
+  ds.write(0x44, 1); // start conversion, with parasite power on at the end
+
+  delay(1000); // maybe 750ms is enough, maybe not  // PROTOTHREAD
+  // we might do a ds.depower() here, but the reset will take care of it.
+
+  present = ds.reset();
+  ds.select(addr);
+  ds.write(0xBE); // Read Scratchpad
+
+  if(Serial) {
+    Serial.print("  Data = ");
+    Serial.print(present, HEX);
+    Serial.print(" ");
+  }
+  for ( i = 0; i < 9; i++) { // we need 9 bytes
+    data[i] = ds.read();
+    if (Serial) {
+      Serial.print(data[i], HEX);
+      Serial.print(" ");
+    }
+  }
+  if(Serial) {
+    Serial.print(" CRC=");
+    Serial.print(OneWire::crc8(data, 8), HEX);
+    Serial.println();
+  }
+
+  // Convert the data to actual temperature
+  // because the result is a 16 bit signed integer, it should
+  // be stored to an "int16_t" type, which is always 16 bits
+  // even when compiled on a 32 bit processor.
+  int16_t raw = (data[1] << 8) | data[0];
+  if (type_s) {
+    raw = raw << 3; // 9 bit resolution default
+    if (data[7] == 0x10) {
+      // "count remain" gives full 12 bit resolution
+      raw = (raw & 0xFFF0) + 12 - data[6];
+    }
+  } else {
+    byte cfg = (data[4] & 0x60);
+    // at lower res, the low bits are undefined, so let's zero them
+    if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
+    else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
+    else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
+    //// default is 12 bit resolution, 750 ms conversion time
+  }
+
+  celsius = (float)raw / 16.0;
+  fahrenheit = celsius * 1.8 + 32.0;
+  if (Serial) {
+    Serial.print("  Temperature = ");
+    Serial.print(celsius);
+    Serial.print(" Celsius, ");
+    Serial.print(fahrenheit);
+    Serial.println(" Fahrenheit");
+  }
+  //on retourne la valeur du capteur
+  return(celsius);
+}//end function
 
 ////////////////////////////////////////////////////////////////////////
 //Fonction pour l'analyse des données recues par la GateWay
 ///////////////////////////////////////////////////////////////////////
 
-void analyse_datas_recues(char* datas_recus)
-{
-	
-	//On extrait les 3 premiers caractères
-	
-	char code_message[3];
-	memset(code_message, 0, 4);
-	strncpy(code_message, datas_recus, 3);
-	puts(code_message);
-	
-	if(Serial){Serial.println(code_message);}
-	
-	
-	
+void analyse_datas_recues(char* datas_recus) {
+  //On extrait les 3 premiers caractères
+  char code_message[3];
+  memset(code_message, 0, 4);
+  strncpy(code_message, datas_recus, 3);
+  puts(code_message);
+  if(Serial){Serial.println(code_message);}
 }
+
+extern int sensorAnalysis(struct pt *pt) {
+  PT_BEGIN(pt);
+  /////////////////////////////////////////
+  //Analyse et lecture des I²C disponibles
+  ////////////////////////////////////////
+  PT_WAIT_UNTIL(pt, (millis() >= (previousMillis + 30000)) || (millis() < 30000));
+  //Variable a envoyer via LoRa
+  char buffer_a_envoyer[100]="";
+  Serial.println(buffer_a_envoyer);
+  Serial.println(strlen(buffer_a_envoyer));
+  //pourcentage de la batterie
+  float SENSOR_BATTERY;
+  byte error, address;
+  int nDevices;
+  float fonction_return_value;
+  char v1_string[5];
+  ////////////////////////////////////
+  //Récupération du niveau de batterie
+  ////////////////////////////////////
+  float measuredvbat = analogRead(VBATPIN);
+  measuredvbat *= 2;    // we divided by 2, so multiply back
+  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+  measuredvbat /= 1024; // convert to voltage
+  SENSOR_BATTERY=measuredvbat;
+  dtostrf(SENSOR_ID, -1, 0, v1_string);
+  snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "M=%s", v1_string);
+  //On écrit le header(en-tête) du buffer_a_envoyer + Niveau de batterie
+  //le "moins" permet d'écrire à gauche
+  dtostrf(SENSOR_BATTERY, -5, 3, v1_string);
+  snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "&B=%s", v1_string);
+
+//end if
+
+  ////////////////////////////////////////////////
+  //Analyse et lecture des analogiques disponibles
+  ////////////////////////////////////////////////
+  if(Serial) {
+    Serial.println("**********************************************************");
+    Serial.println("Analyse et lecture des analogiques disponibles en cours...");
+    Serial.println("**********************************************************");
+  }
+  int pinA0=0;
+  int pinA1=0;
+  int pinA2=0;
+
+  pinA0=digitalRead(A0);
+  pinA1=analogRead(A1);
+  pinA2=analogRead(A2);
+
+  if (Serial) {
+    Serial.print("PIN_A0 = ");
+    Serial.println(pinA0);
+    Serial.print("PIN_A1 = ");
+    Serial.println(pinA1);
+    Serial.print("PIN_A2 = ");
+    Serial.println(pinA2);
+  }
+
+  //On écrit
+  //le "moins" permet d'écrire à gauche
+  dtostrf(pinA0, -1, 0, v1_string);
+  //On récrit dans la variable du buffer
+  snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "&A0=%s", v1_string);
+  //On écrit
+  //le "moins" permet d'écrire à gauche
+  dtostrf(pinA1, -1, 0, v1_string);
+  //On récrit dans la variable du buffer
+  snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "&A1=%s", v1_string);
+  //On écrit
+  //le "moins" permet d'écrire à gauche
+  dtostrf(pinA2, -1, 0, v1_string);
+  //On récrit dans la variable du buffer
+  snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "&A2=%s", v1_string);
+  if(Serial) {
+    Serial.print(millis());
+    Serial.println(";I;Begin I²C analysis");
+  }
+
+  nDevices = 0;
+  for(address = 1; address < 127; address++ ) {
+    digitalWrite(v_I2C, HIGH);
+    /* REMARQUE :
+     * Le scanner utilise la valeur de retour de Write.endTransmisstion
+     * pour voir si un périphérique a émit un accusé réception de l'adresse
+     */
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0) {
+      if (Serial) {
+        Serial.print(millis());
+        Serial.print(";I;Sensor found at 0x");
+        Serial.println(address,HEX);
+      }
+      nDevices++;
+
+      //////////////////////////////////
+      //SHT31 : Température et humidité
+      //Adresse I²C: 0x44
+      /////////////////////////////////
+
+      if(address == 0x44) { //Adresse en Hexadécimal
+        if (Serial) {Serial.print(millis());}
+        if (! sht31.begin(0x44)) {
+          if (Serial) {Serial.println(";E;H1 or T1 not connected");}
+        }
+        else {
+          //on lit les informations de ce capteur
+          float t = sht31.readTemperature();
+          float h = sht31.readHumidity();
+
+          if (!isnan(t)) {  // check if 'is not a number'
+            if (Serial) {
+              Serial.print(";I;t = ");
+              Serial.print(t);
+            }
+          } else {
+            if (Serial) {Serial.println(";W;t = null");}
+          }
+          if (!isnan(h)) {  // check if 'is not a number'
+            if (Serial) {
+              Serial.print(";I;H = ");
+              Serial.println(h);
+            }
+          } else {
+            if (Serial) {Serial.println(";W;H = null");}
+          }
+          //le "moins" permet d'écrire à gauche
+          dtostrf(t, -5, 3, v1_string);
+          //On récrit dans la variable du buffer
+          snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "&C1=%s", v1_string);
+          //le "moins" permet d'écrire à gauche
+          dtostrf(h, -5, 3, v1_string);
+          //On récrit dans la variable du buffer
+          snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "&H1=%s", v1_string);
+        }
+      }
+    }
+    else if (error==4) {
+      if(Serial){Serial.print("Erreur inconnue à l'adresse 0x");}
+      if (address<16)
+      if(Serial) {
+        Serial.print(millis());
+        Serial.print(";E;Unknown error at 0x");
+        Serial.println(address,HEX);
+      }
+    }
+    digitalWrite(v_I2C, LOW);
+  }
+  if (Serial) {Serial.print(millis());}
+  if (nDevices == 0) {
+    if(Serial){Serial.println(";E;No device found");}
+  }
+  else {
+    if(Serial){Serial.println(";I;End I²C analysis");}
+  }
+  ///////////////////////////////////////////////////////
+  //Analyse et lecture des 1-Wire disponibles en cours...
+  ///////////////////////////////////////////////////////
+
+  if(Serial) {
+    Serial.print(millis());
+    Serial.println(";I;Begin 1-Wire analysis");
+  }
+  byte i;
+  byte present = 0;
+  byte data[12];
+  byte addr[8];
+
+  if (Serial) {Serial.print(millis());}
+  if (!ds.search(addr)) {
+    if(Serial){Serial.println(";F;No 1-Wire detected");}
+    /*
+    if(Serial){Serial.println("Recherche terminée");}
+
+    ds.reset_search();
+    delay(2500);
+
+    return;
+    */
+  }
+  else {
+  //On récrit dans la variable du buffer
+  snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "&G=");
+  if (Serial) {
+    Serial.print(millis());
+    Serial.print(";D;ROM =");
+  }
+  for( i = 0; i < 8; i++) {
+    Serial.write(' ');
+    if (addr[i]<16) {
+      if (Serial) {Serial.print("0");}
+      //le "moins" permet d'écrire à gauche
+      dtostrf(0, -0, 0, v1_string);
+      //On récrit dans la variable du buffer
+      snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "%s", v1_string);
+    }
+    if(Serial){Serial.print(addr[i], HEX);}
+    //le "moins" permet d'écrire à gauche
+    dtostrf(addr[i], -0, 0, v1_string);
+    //On récrit dans la variable du buffer
+    snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "%s", v1_string);
+  }
+
+  if (OneWire::crc8(addr, 7) != addr[7]) {
+    if(Serial){Serial.println(";invalid CRC");}
+  }
+  if(Serial){Serial.println();}
+
+  if(Serial) {
+    Serial.print("CHIP ");
+    Serial.print(addr[0],HEX);
+    //Le premier octet (ROM) indique quelle est le chip (dipositif)
+    Serial.print(" = ");
+  }
+  switch (addr[0]) {
+    case 0x01:
+      if(Serial){Serial.println("DS1990 DS2401");}
+      break;
+    case 0x02:
+      if(Serial){Serial.println("DS1991");}
+      break;
+    case 0x04:
+      if(Serial){Serial.println("DS1994");}
+      break;
+    case 0x05:
+      if(Serial){Serial.println("DS2405");}
+      break;
+    case 0x06:
+      if(Serial){Serial.println("DS1992");}
+      break;
+    case 0x08:
+      if(Serial){Serial.println("DS1993");}
+      break;
+    case 0x0B:
+      if(Serial){Serial.println("DS1985");}
+      break;
+    case 0x10:
+      if(Serial){Serial.println("DS1820 DS18S20 DS1920");}
+      break;
+    case 0x12:
+      if(Serial){Serial.println("DS2406");}
+      break;
+    case 0x21:
+      if(Serial){Serial.println("DS1921");}
+      break;
+    case 0x22:
+      if(Serial){Serial.println("DS1822");}
+      break;
+    case 0x24:
+      if(Serial){Serial.println("DS1904");}
+      break;
+    case 0x28:
+      if(Serial){Serial.println("DS18B20");}
+      if(Serial){Serial.println("Lecture des données de ce chip...");}
+      //On appelle la fonction pour la lecture
+      fonction_return_value = lecture_DS18B20(addr);
+      //le "moins" permet d'écrire à gauche
+      dtostrf(fonction_return_value, -5, 3, v1_string);
+      //On récrit dans la variable du buffer
+      snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "/DS18B20=%s", v1_string);
+      break;
+    case 0x29:
+      if(Serial){Serial.println("DS2408");}
+      break;
+    case 0x36:
+      if(Serial){Serial.println("DS2740");}
+      break;
+    case 0x3B:
+      if(Serial){Serial.println("DS1825");}
+      break;
+    case 0x41:
+      if(Serial){Serial.println("DS1923");}
+      break;
+    default:
+      if(Serial){Serial.println(" n'est pas répertorié.");}
+      break;
+    }
+  }
+  if(Serial) {
+    Serial.print(millis());
+    Serial.println(";I;End 1-Wire analysis");
+  }
+  previousMillis = millis();
+  if(Serial) {
+    Serial.println("----------------------------------------------- FIN DES SCANS -----------------------------------------------");
+    Serial.print(millis());
+    Serial.print(";I;buffer = ");
+    Serial.println(buffer_a_envoyer);
+    Serial.println(strlen(buffer_a_envoyer));
+  }
+  sensorFIFO.push((uint8_t)strlen(buffer_a_envoyer));
+  for(int i = 0; i < strlen(buffer_a_envoyer); i++) {
+    sensorFIFO.push((uint8_t)buffer_a_envoyer[i]);
+  }
+  sensorFIFO.peekString(tmpBuffer, 100);
+  for(int i = 0; i < sensorFIFO.peek(); i++) {
+    Serial.print((char)tmpBuffer[i]);
+  }
+  Serial.println("");
+  //Serial.println(sensorFIFO.pop());
+  Serial.println(sensorFIFO.size());
+  //Serial.println("1");
+  tmpQueueSize++;
+  //Si on est en mode DEBUG, alors on laisse un petit delai
+  PT_END(pt);
+}
+
+static int loRaSending(struct pt *pt) {
+  PT_BEGIN(pt);
+  //////////////////////////////////
+  //ENVOIE DES INFORMATIONS VIA LoRa
+  //////////////////////////////////
+  PT_WAIT_UNTIL(pt, !(sensorFIFO.isEmpty()));
+  if(Serial) {
+    Serial.println("*****************************************************");
+    Serial.println("Transmission des données via LoRa (RF95)");
+    Serial.println("*****************************************************");
+  }
+  Serial.println("2");
+  //char* test = queue.peekString();
+  /*for(int i=0; i<100; i++){
+    Serial.println(test[i], HEX);
+  }*/
+  //Serial.println(*test, HEX);
+  
+  if (Serial) {Serial.print(millis());}
+  //Activation du LoRa
+  if (!rhRDatagram.init()) {
+    if(Serial){Serial.println(";E;LoRa not initialized");}
+  } else {
+    if(Serial){Serial.println(";I;LoRa initialized");}
+  }
+  if (Serial) {
+    Serial.print(millis());
+    Serial.print(";I;FIFO size = ");
+    Serial.println(sensorFIFO.size());
+  }
+  radioDriver.setFrequency(frequence_LoRa);
+  radioDriver.setTxPower(puissance_signal_LoRa);
+  radioDriver.setSignalBandwidth(bande_passante_LoRa);
+  if (Serial) {Serial.print(millis());}
+  if (!(sensorFIFO.isEmpty())) {
+    uint8_t sendToAddress = 253;
+//  uint8_t buf[sensorFIFO.peek()] = 
+    sensorFIFO.peekString(tmpBuffer, 100);
+    for(int i = 0; i < sensorFIFO.peek(); i++) {
+      Serial.print((char)tmpBuffer[i]);
+    }
+    if(rhRDatagram.sendtoWait(tmpBuffer, sensorFIFO.peek(), sendToAddress)) {
+      for(int i = 0; i < sensorFIFO.peek(); i++) {sensorFIFO.pop();}
+      if (Serial) {Serial.println(";I;Packet sent");}
+    }
+    else{
+      if (Serial) {
+        Serial.println(";W;Packet not sent");
+        Serial.println(sensorFIFO.size());
+      }
+    }
+  }
+  if(sensorFIFO.size() >= 47 * 5) {
+    while(!(sensorFIFO.isEmpty())) {
+      sensorFIFO.popString(tmpBuffer, 100);
+      for(int i = 0; i < sensorFIFO.peek(); i++) {
+        Serial.print((char)tmpBuffer[i]);
+      }
+      Serial.println("");
+    }
+  }
+  PT_END(pt);
+}
+
+extern int receiving(struct pt *pt) {
+  PT_BEGIN(pt);
+  PT_WAIT_UNTIL(pt, sensorFIFO.size() < tmpQueueSize);
+  //PT_WAIT_UNTIL(pt, sensorFIFO.size() < tmpQueueSize);
+  //Délai d'attente d'une réponse LoRa (par defaut : 5 secondes)
+  int delai_reponse_LoRa = 1;
+  long duree_attente_aleatoire;
+  tmpQueueSize--;
+  //On attend que le packet ait bien été envoyé...
+  // Maintenant, on attend une éventuelle réponse de notre GateWay
+  uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
+  uint8_t len = sizeof(buf);
+  uint8_t from;
+  uint16_t timeout = 5000;
+  char verification[4];
+  char tmp[1];
+  dtostrf(SENSOR_ID, -1, 0, tmp);
+  snprintf(verification, 4, "%s%s", "M=", tmp);
+
+  if (rhRDatagram.waitAvailableTimeout(delai_reponse_LoRa*1000)) {
+    // Should be a reply message for us now
+    if (rhRDatagram.recvfromAckTimeout(buf, &len, timeout, &from)) {
+      if(Serial) {
+        Serial.print(millis());
+        Serial.print(";D;Response Received");
+        Serial.print(";RSSI: ");
+        Serial.print(radioDriver.lastRssi(), DEC);
+        RH_RF95::printBuffer(";Received datas [HEXA]: ", buf, len);
+      }
+      //On vide le buffer_a_envoyer car il a bien été recu...
+      //memset(buffer_a_envoyer, 0, sizeof(buffer_a_envoyer));
+
+      //On traite la réponse reçue via notre fonction de traitement de données recues
+      //analyse_datas_recues((char*)buf);
+      //On verifie si le recepteur a bien recu notre réponse...
+      if (String((char*)buf) == verification) {
+        if (Serial) {
+          Serial.print(millis());
+          Serial.println(";D;GATEWAY got response");
+        }
+        delay(5000); // PROTOTHREAD
+      }
+      else {
+        if (Serial) {
+          Serial.print(millis());
+          Serial.println(";W;Interference");
+        }
+        //on attend une durée aléatoire avant de renvoyé!
+        duree_attente_aleatoire = random(1000,15000);
+        if (Serial) {
+          Serial.print("on attend ");
+          Serial.print(duree_attente_aleatoire);
+          Serial.println("ms avant de re envoyé...");
+        }
+        delay(duree_attente_aleatoire); // PROTOTHREAD
+        if (Serial) {
+          Serial.println(verification);
+          Serial.println("On envoie...");
+        }
+        uint8_t sendToAddress = 253;
+        //char* buffer_a_envoyer = removeFromFIFO(sensorFIFO);
+        sensorFIFO.peekString(tmpBuffer, 100);
+        for(int i = 0; i < sensorFIFO.peek(); i++) {
+          Serial.print((char)tmpBuffer[i]);
+        }
+        if(rhRDatagram.sendtoWait(tmpBuffer, sensorFIFO.peek(), sendToAddress)) { // PROTOTHREAD
+          if(Serial){
+            Serial.print(millis());
+            Serial.println(";D;Packet sent");
+          }
+          for(int i = 0; i < sensorFIFO.peek(); i++) {sensorFIFO.pop();}
+        }
+        else {
+          Serial.println(";W;Packet not sent");
+        }
+      }
+    }
+    else {
+      if (Serial) {
+        Serial.print(millis());
+        Serial.println(";W;Listening Problem");
+      }
+    }
+  }
+  else {
+    if (Serial) {
+      Serial.print(millis());
+      Serial.println(";W;No response");
+    }
+  }
+  PT_END(pt);
+}
+/*
+void addToFIFO(FIFO fifo, char* buffer) {
+//  dtostrf(fonction_return_value, -5, 3, v1_string);
+  sensorFIFO.push(strlen(buffer));
+  for (int i = 0; i < strlen(buffer); i++) {
+    sensorFIFO.push(buffer[i]);
+  }
+}
+
+char* removeFromFIFO(FIFO fifo) {
+  Serial.println("je passe ici");
+  char tmpSize = sensorFIFO.pop();
+  int sizeTmpBuffer = (int)tmpSize;
+  char tmpBuffer[sizeTmpBuffer];
+  for(int i = 0; i < sizeTmpBuffer; i++) {
+    tmpBuffer[i] = (char)sensorFIFO.pop();
+  }
+  return tmpBuffer;
+}*/
