@@ -55,15 +55,21 @@ Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 #define CLIENT_ADRRESS 4
 #define HTTP_PORT 80
 
+#define STRING_LEN 128
+#define CONFIG_VERSION "dem2"
+
+#define CONFIG_PIN 15
+#define STATUS_PIN 13
+
+// Change to 434.0 or other frequency, must match RX's freq!
+#define RF95_FREQ frequence_LoRa
+
 //Fréquence d'utilisation (par defaut 869.35 MHz)
 float frequence_LoRa = 869.35;
 //Bande passante utilisée (par defaut : 62,5 KHz)
 long bande_passante_LoRa = 62500;
 //Puissance utilisée (par defaut : 10 mW)
 uint8_t puissance_signal_LoRa = 10;
-
-// Change to 434.0 or other frequency, must match RX's freq!
-#define RF95_FREQ frequence_LoRa
 
 // Singleton instance of the radio driver
 RH_RF95 radioDriver(RFM95_CS, RFM95_INT);
@@ -124,16 +130,10 @@ String URL;
 String Date;
 String buffer_recu;
 String ID_recu;
-static struct pt sensorAnalysisPT, receivingPT, sendDataPT;
+static struct pt receivingPT, sendDataPT;
 
 const char thingName[] = "Akuino";
 const char wifiInitialApPassword[] = "12345678";
-
-#define STRING_LEN 128
-#define CONFIG_VERSION "dem2"
-
-#define CONFIG_PIN 15
-#define STATUS_PIN 13
 
 char host[STRING_LEN];
 IotWebConfParameter iwcHostServer;
@@ -252,27 +252,10 @@ void setup() {
     Serial.print(millis());
     Serial.printf(";SD storage size : %lluMB\n", cardSize);
   }
-/*
-    listDir(SD, "/", 0);
-    createDir(SD, "/mydir");
-    listDir(SD, "/", 0);
-    removeDir(SD, "/mydir");
-    listDir(SD, "/", 2);
-    writeFile(SD, "/hello.txt", "Hello ");
-    appendFile(SD, "/hello.txt", "World!\n");
-    readFile(SD, "/hello.txt");
-    deleteFile(SD, "/foo.txt");
-    renameFile(SD, "/hello.txt", "/foo.txt");
-    readFile(SD, "/foo.txt");
-    testFileIO(SD, "/test.txt");
-    Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
-    Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
-
-
-*/
-  PT_INIT(&sensorAnalysisPT);
+  
   PT_INIT(&receivingPT);
   PT_INIT(&sendDataPT);
+  
   if(Serial) {
     Serial.print(millis());
     Serial.println(";D;Connected to WiFi");
@@ -282,7 +265,6 @@ void setup() {
 
 void loop() {
   iotWebConf.doLoop();
-  //sensorAnalysis(&sensorAnalysisPT);
   receiving(&receivingPT);
   sendData(&sendDataPT);
 }
@@ -572,12 +554,6 @@ void testFileIO(fs::FS &fs, const char * path){
   file.close();
 }
 
-extern int sensorAnalysis(struct pt *pt) {
-  PT_BEGIN(pt);
-  PT_WAIT_UNTIL(pt, 0 == 1);
-  if(Serial) {Serial.println("BLOUBLOU");}
-  PT_END(pt);
-}
 
 extern int receiving(struct pt *pt) {
   PT_BEGIN(pt);
@@ -659,12 +635,11 @@ extern int receiving(struct pt *pt) {
       }
       unsigned long ttl = millis();
       //WiFiClient client;
-      const int httpPort = 80;
 
       ///////////////////////////////////////////
       //On envoie au serveur ELSA
       //////////////////////////////////////////
-      int count = snprintf(URL_HTTPS, SIZE_URL_HTTPS, "/api/kv?R=%u&%s", RSSI_SENSOR, (char*)buf);
+      int count = snprintf(URL_HTTPS, SIZE_URL_HTTPS, "%u&%s", RSSI_SENSOR, (char*)buf);
       
       Serial.print(millis());
       if(serverfifo.pushBuffer((uint8_t*)URL_HTTPS,count)){
@@ -680,53 +655,6 @@ extern int receiving(struct pt *pt) {
         Serial.print(";D;URL HTTPS : ");
         Serial.println(URL_HTTPS);
       }
-      /*
-      URL=String(URL_HTTPS);
-
-      // Use WiFiClient class to create TCP connections
-
-      if (!client.connect(host, httpPort)) {
-        if(Serial) {
-          Serial.print(millis());
-          Serial.println(";W;HTTP connection failed");
-        }
-      }
-
-      if(Serial) {
-        Serial.print(millis());
-        Serial.print("Requesting URL: ");
-        Serial.println(URL_HTTPS);
-      }
-
-      // This will send the request to the server
-      client.print(String("GET ") + URL + " HTTP/1.1\r\n" +
-                 "Host: " + host + "\r\n" +
-                 "Connection: close\r\n\r\n");
-      
-      
-      boolean flip = true;
-      while (client.available() == 0 && flip) {
-        if ((millis() - ttl) > 5000) {
-          if(Serial) {
-            Serial.print(millis());
-            Serial.println(";W;Client Timeout -  FLIIIP");
-          }
-          client.stop();
-          flip = false;
-        }
-      }
-      if(Serial and flip){
-        Serial.print(millis());
-        Serial.print(";I;Server response");
-      }
-      
-      // Read all the lines of the reply from server and print them to Serial
-      while(client.available()) {
-        String line = client.readStringUntil('\r');
-        if(Serial) {
-          Serial.print(line);
-        }
-      }*/
     }
     else {
       if(Serial) {
@@ -747,8 +675,11 @@ extern int sendData(struct pt *pt) {
     Serial.println(";I;Sending data on both servers (ELSA + SERVEUR LOCAL)");
   }
   uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
+  char buf2[RH_RF95_MAX_MESSAGE_LEN];
+  
   serverfifo.peekBuffer(buf, RH_RF95_MAX_MESSAGE_LEN);
-  URL=String((char*)buf);
+  int count = snprintf(buf2, RH_RF95_MAX_MESSAGE_LEN, "/api/kv?R=%s", (char*)buf);
+  URL=String(buf2);
   // Use WiFiClient class to create TCP connections
 
   if (!client.connect(host, HTTP_PORT)) {
@@ -757,8 +688,8 @@ extern int sendData(struct pt *pt) {
       Serial.println(";W;HTTP connection failed");
     }
   }
-
-  if(Serial) {
+  else{
+    if(Serial) {
     Serial.print(millis());
     Serial.print("Requesting URL: ");
     Serial.println(URL_HTTPS);
@@ -770,19 +701,20 @@ extern int sendData(struct pt *pt) {
              "Connection: close\r\n\r\n");
     
     
-    boolean flip = true;
+    boolean error = false;
     int timeout = millis();
-    while (client.available() == 0 && flip) {
+    while (client.available() == 0 && !error) {
       if ((millis() - timeout) > 5000) {
         if(Serial) {
           Serial.print(millis());
           Serial.println(";W;Client Timeout -  FLIIIP");
         }
         client.stop();
-        flip = false;
+        error = true;
       }
     }
-    if(Serial and flip){
+    
+    if(Serial && !error){
       Serial.print(millis());
       Serial.print(";I;Server response");
     }
@@ -793,7 +725,7 @@ extern int sendData(struct pt *pt) {
       if(Serial) {
         Serial.print(line);
       }
-    }
-    //On écrit sur la carte SD
+    }  
+  }
   PT_END(pt);
 }
