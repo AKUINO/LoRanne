@@ -116,7 +116,7 @@ void loop() {
 
   sensorAnalysis(&sensorAnalysisPT);
   loRaSending(&sendingPT);
-  receiving(&receivingPT);
+  //receiving(&receivingPT);
 
   if(Serial) {
     Serial.print(millis());
@@ -508,7 +508,6 @@ extern int sensorAnalysis(struct pt *pt) {
     Serial.println(strlen(buffer_a_envoyer));
   }
   sensorFIFO.pushBuffer((uint8_t*)buffer_a_envoyer, strlen(buffer_a_envoyer));
-  Serial.println("");
   //Serial.println(sensorFIFO.pop());
   Serial.println(sensorFIFO.size());
   //Serial.println("1");
@@ -541,6 +540,7 @@ static int loRaSending(struct pt *pt) {
     if(Serial){Serial.println(";E;LoRa not initialized");}
   } else {
     if(Serial){Serial.println(";I;LoRa initialized");}
+    Serial.println(RH_PLATFORM_STM32);
   }
   if (Serial) {
     Serial.print(millis());
@@ -559,13 +559,13 @@ static int loRaSending(struct pt *pt) {
       Serial.print((char)tmpBuffer[i]);
     }
     if(rhRDatagram.sendtoWait(tmpBuffer, sensorFIFO.peek(), SERVER_ADDRESS)) {
-      sensorFIFO.popBuffer(tmpBuffer, strlen((char*)tmpBuffer));
+      sensorFIFO.popBuffer(tmpBuffer, SIZE_BUFFER);
       if (Serial) {Serial.println(";I;Packet sent");}
-      Serial.println("flibidi");
       // Now wait for a reply from the server
       uint8_t len = sizeof(buf);
       uint8_t from;
       if (rhRDatagram.recvfromAckTimeout(buf, &len, 2000, &from)) {
+        buf[len] = '\0';
         Serial.print("got reply from : 0x");
         Serial.print(from, HEX);
         Serial.print(": ");
@@ -594,7 +594,7 @@ static int loRaSending(struct pt *pt) {
   PT_END(pt);
 }
 
-extern int receiving(struct pt *pt) {
+/*extern int receiving(struct pt *pt) {
   PT_BEGIN(pt);
   PT_WAIT_UNTIL(pt, sensorFIFO.size() < tmpQueueSize);
   //PT_WAIT_UNTIL(pt, sensorFIFO.size() < tmpQueueSize);
@@ -684,23 +684,4 @@ extern int receiving(struct pt *pt) {
     }
   }
   PT_END(pt);
-}
-/*
-void addToFIFO(FIFO fifo, char* buffer) {
-//  dtostrf(fonction_return_value, -5, 3, v1_string);
-  sensorFIFO.push(strlen(buffer));
-  for (int i = 0; i < strlen(buffer); i++) {
-    sensorFIFO.push(buffer[i]);
-  }
-}
-
-char* removeFromFIFO(FIFO fifo) {
-  Serial.println("je passe ici");
-  char tmpSize = sensorFIFO.pop();
-  int sizeTmpBuffer = (int)tmpSize;
-  char tmpBuffer[sizeTmpBuffer];
-  for(int i = 0; i < sizeTmpBuffer; i++) {
-    tmpBuffer[i] = (char)sensorFIFO.pop();
-  }
-  return tmpBuffer;
 }*/
