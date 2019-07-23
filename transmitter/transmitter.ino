@@ -9,6 +9,8 @@
 Programme de check-up + envoie des données sur le GateWay via LoRa
 
 */
+#define CLIENT_ADDRESS 4
+#define SERVER_ADDRESS 120
 uint8_t SENSOR_ID = 4;
 
 #include <Wire.h>
@@ -26,8 +28,7 @@ Adafruit_SHT31 sht31 = Adafruit_SHT31();
 uint8_t slaveSelectPin = 8, interruptPin = 3;
 RH_RF95 radioDriver(slaveSelectPin, interruptPin);
 #include <RHReliableDatagram.h>
-uint8_t datagramAddress = 253;
-RHReliableDatagram rhRDatagram(radioDriver, datagramAddress);
+RHReliableDatagram rhRDatagram(radioDriver, CLIENT_ADDRESS);
 
 /////////////////////////////
 //Déclaration des sorties
@@ -43,14 +44,14 @@ OneWire  ds(oneWireOutput);
 //Fréquence d'utilisation (par defaut 869.35 MHz)
 float frequence_LoRa = 869.35;
 //Bande passante utilisée (par defaut : 62,5 KHz)
-float bande_passante_LoRa = 62500;
+long bande_passante_LoRa = 62500;
 //Puissance utilisée (par defaut : 10 mW)
-float puissance_signal_LoRa = 10;
+uint8_t puissance_signal_LoRa = 10;
 
 //Compteur de millisecondes pour vérifier le système de badge
 unsigned long previousMillis=0;
 //Taille FIXE Maximale du buffer d'envoi LoRa
-uint8_t SIZE_BUFFER = 100;
+#define SIZE_BUFFER 100
 uint32_t compteur = 0;
 //QueueList <char> queue;
 FIFO sensorFIFO;
@@ -506,14 +507,7 @@ extern int sensorAnalysis(struct pt *pt) {
     Serial.println(buffer_a_envoyer);
     Serial.println(strlen(buffer_a_envoyer));
   }
-  sensorFIFO.push((uint8_t)strlen(buffer_a_envoyer));
-  for(int i = 0; i < strlen(buffer_a_envoyer); i++) {
-    sensorFIFO.push((uint8_t)buffer_a_envoyer[i]);
-  }
-  sensorFIFO.peekString(tmpBuffer, 100);
-  for(int i = 0; i < sensorFIFO.peek(); i++) {
-    Serial.print((char)tmpBuffer[i]);
-  }
+  sensorFIFO.pushBuffer((uint8_t*)buffer_a_envoyer, strlen(buffer_a_envoyer));
   Serial.println("");
   //Serial.println(sensorFIFO.pop());
   Serial.println(sensorFIFO.size());
@@ -535,7 +529,7 @@ static int loRaSending(struct pt *pt) {
     Serial.println("*****************************************************");
   }
   Serial.println("2");
-  //char* test = queue.peekString();
+  //char* test = queue.peekBuffer();
   /*for(int i=0; i<100; i++){
     Serial.println(test[i], HEX);
   }*/
@@ -553,20 +547,33 @@ static int loRaSending(struct pt *pt) {
     Serial.print(";I;FIFO size = ");
     Serial.println(sensorFIFO.size());
   }
+  uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
   radioDriver.setFrequency(frequence_LoRa);
   radioDriver.setTxPower(puissance_signal_LoRa);
   radioDriver.setSignalBandwidth(bande_passante_LoRa);
   if (Serial) {Serial.print(millis());}
   if (!(sensorFIFO.isEmpty())) {
-    uint8_t sendToAddress = 253;
 //  uint8_t buf[sensorFIFO.peek()] = 
-    sensorFIFO.peekString(tmpBuffer, 100);
+    sensorFIFO.peekBuffer(tmpBuffer, SIZE_BUFFER);
     for(int i = 0; i < sensorFIFO.peek(); i++) {
       Serial.print((char)tmpBuffer[i]);
     }
-    if(rhRDatagram.sendtoWait(tmpBuffer, sensorFIFO.peek(), sendToAddress)) {
-      for(int i = 0; i < sensorFIFO.peek(); i++) {sensorFIFO.pop();}
+    if(rhRDatagram.sendtoWait(tmpBuffer, sensorFIFO.peek(), SERVER_ADDRESS)) {
+      sensorFIFO.popBuffer(tmpBuffer, strlen((char*)tmpBuffer));
       if (Serial) {Serial.println(";I;Packet sent");}
+      Serial.println("flibidi");
+      // Now wait for a reply from the server
+      uint8_t len = sizeof(buf);
+      uint8_t from;
+      if (rhRDatagram.recvfromAckTimeout(buf, &len, 2000, &from)) {
+        Serial.print("got reply from : 0x");
+        Serial.print(from, HEX);
+        Serial.print(": ");
+        Serial.println((char*)buf);
+      }
+      else {
+        Serial.println("No reply, is rf95_reliable_datagram_server running?");
+      }
     }
     else{
       if (Serial) {
@@ -577,7 +584,7 @@ static int loRaSending(struct pt *pt) {
   }
   if(sensorFIFO.size() >= 47 * 5) {
     while(!(sensorFIFO.isEmpty())) {
-      sensorFIFO.popString(tmpBuffer, 100);
+      sensorFIFO.popBuffer(tmpBuffer, 100);
       for(int i = 0; i < sensorFIFO.peek(); i++) {
         Serial.print((char)tmpBuffer[i]);
       }
@@ -646,13 +653,12 @@ extern int receiving(struct pt *pt) {
           Serial.println(verification);
           Serial.println("On envoie...");
         }
-        uint8_t sendToAddress = 253;
         //char* buffer_a_envoyer = removeFromFIFO(sensorFIFO);
-        sensorFIFO.peekString(tmpBuffer, 100);
+        sensorFIFO.peekBuffer(tmpBuffer, 100);
         for(int i = 0; i < sensorFIFO.peek(); i++) {
           Serial.print((char)tmpBuffer[i]);
         }
-        if(rhRDatagram.sendtoWait(tmpBuffer, sensorFIFO.peek(), sendToAddress)) { // PROTOTHREAD
+        if(rhRDatagram.sendtoWait(tmpBuffer, sensorFIFO.peek(), SERVER_ADDRESS)) { // PROTOTHREAD
           if(Serial){
             Serial.print(millis());
             Serial.println(";D;Packet sent");
