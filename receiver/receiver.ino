@@ -10,6 +10,7 @@
 #include <IotWebConf.h>
 #include "FIFO.h"
 #include "RTClib.h"
+#include "JBCDIC.h"
 
 #if defined(ARDUINO_ARCH_SAMD)
    #define Serial SerialUSB
@@ -122,9 +123,9 @@ const char* test_root_ca2= \
 WiFiClientSecure client;
 
 //Taille FIXE Maximale du buffer d'envoi LoRa
-uint8_t SIZE_URL_HTTPS = 200;
+#define SIZE_URL_HTTPS 200
 //Variable a envoyer via LoRa
-char URL_HTTPS[200];
+char URL_HTTPS[SIZE_URL_HTTPS];
 
 String URL;
 String Date;
@@ -135,7 +136,7 @@ static struct pt receivingPT, sendDataPT;
 const char thingName[] = "Akuino";
 const char wifiInitialApPassword[] = "12345678";
 
-char host[STRING_LEN];
+char hostServer[STRING_LEN];
 IotWebConfParameter iwcHostServer;
 
 boolean formValidator();
@@ -197,7 +198,7 @@ void setup() {
   delay(10);
   digitalWrite(RFM95_RST, HIGH);
   delay(10);
-
+  strncpy(hostServer, iotWebConf.getHostName(), STRING_LEN);
   while (!rhRDatagram.init()) {
     if(Serial) {
       Serial.print(millis());
@@ -296,10 +297,10 @@ boolean formValidator() {
   }
 
   int num_args = server.arg(iwcHostServer.getId()).length();
-  (server.arg(iwcHostServer.getId())).toCharArray(host, STRING_LEN);
+  (server.arg(iwcHostServer.getId())).toCharArray(hostServer , STRING_LEN);
   if(Serial) {
     Serial.print(";Host : ");
-    Serial.println(host);
+    Serial.println(hostServer );
   }
   if (num_args < 3) {
     iwcHostServer.errorMessage = "Please provide at least 3 characters for this test!";
@@ -561,6 +562,7 @@ extern int receiving(struct pt *pt) {
   if (rhRDatagram.available()) {
     // Should be a message for us now
     uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
+    char buf2[RH_RF95_MAX_MESSAGE_LEN];
     uint8_t len = RH_RF95_MAX_MESSAGE_LEN;
     uint16_t timeout = 5000;
     uint8_t from;
@@ -571,13 +573,14 @@ extern int receiving(struct pt *pt) {
         Serial.println(";I;Message received");
       }
       buf[len] = '\0';
-      
-      RH_RF95::printBuffer("Données recues [HEXA]: ", buf, len);
+      int sz = JBCDIC::decode_from_jbcdic(buf, len, buf2, RH_RF95_MAX_MESSAGE_LEN);
+      buf2[sz] = '\0';
+      RH_RF95::printBuffer("Données recues [HEXA]: ", (uint8_t *)buf2, len);
       if(Serial) {
         Serial.print(millis());
         Serial.print(";I;Received datas [Texte]: ");
         for(int i =0; i < len; i++){
-            Serial.print((char) buf[i]); 
+            Serial.print(buf2[i]); 
         }
         Serial.print(";RSSI: ");
         Serial.println(radioDriver.lastRssi(), DEC);
@@ -607,14 +610,14 @@ extern int receiving(struct pt *pt) {
         Serial.println(ID_recu);
       }
       
-      if(rhRDatagram.sendtoWait((uint8_t *)buf, len, from)) {
+      if(rhRDatagram.sendtoWait((uint8_t *)buf2, sz, from)) {
         if(Serial) {
           Serial.print(millis());
           Serial.print(";D;Response sent");
           Serial.println(";Saving data on micro-SD");
         }
       }
-      appendFile(SD, "/sauvegarde.txt", (char*)buf);
+      appendFile(SD, "/sauvegarde.txt", buf2);
       
       display.clearDisplay();
       display.display();
@@ -623,7 +626,7 @@ extern int receiving(struct pt *pt) {
       display.setTextColor(WHITE);
       display.setCursor(0,0);
       display.println("MESSAGE RECU :");
-      display.print((char*)buf);
+      display.print(buf2);
       display.setCursor(0,0);
       display.display(); // actually display all of the above
       
@@ -631,7 +634,7 @@ extern int receiving(struct pt *pt) {
       if(Serial) {
         Serial.print(millis());
         Serial.print(";D;Host : ");
-        Serial.println(host);
+        Serial.println(hostServer );
       }
       unsigned long ttl = millis();
       //WiFiClient client;
@@ -639,7 +642,7 @@ extern int receiving(struct pt *pt) {
       ///////////////////////////////////////////
       //On envoie au serveur ELSA
       //////////////////////////////////////////
-      int count = snprintf(URL_HTTPS, SIZE_URL_HTTPS, "%u&%s", RSSI_SENSOR, (char*)buf);
+      int count = snprintf(URL_HTTPS, SIZE_URL_HTTPS, "%u&%s", RSSI_SENSOR, buf2);
       
       Serial.print(millis());
       if(serverfifo.pushBuffer((uint8_t*)URL_HTTPS,count)){
@@ -682,7 +685,7 @@ extern int sendData(struct pt *pt) {
   URL=String(buf2);
   // Use WiFiClient class to create TCP connections
 
-  if (!client.connect(host, HTTP_PORT)) {
+  if (!client.connect(hostServer , HTTP_PORT)) {
     if(Serial) {
       Serial.print(millis());
       Serial.println(";W;HTTP connection failed");
@@ -697,7 +700,7 @@ extern int sendData(struct pt *pt) {
 
   // This will send the request to the server
   client.print(String("GET ") + URL + " HTTP/1.1\r\n" +
-             "Host: " + host + "\r\n" +
+             "Host: " + hostServer + "\r\n" +
              "Connection: close\r\n\r\n");
     
     
