@@ -7,6 +7,7 @@
 #include <Adafruit_SSD1306.h>
 #include <RH_RF95.h>
 #include <WiFiClientSecure.h>
+#include <WiFiClient.h>
 #include <IotWebConf.h>
 #include "FIFO.h"
 #include "RTClib.h"
@@ -120,7 +121,7 @@ const char* test_root_ca2= \
 "/A3hZ+wpT3sK6uWF/fenyZNt4/mgxoSbkYS/uaI5HSMD\n" \
 "-----END CERTIFICATE-----\n";
 
-WiFiClientSecure client;
+WiFiClient client;
 
 //Taille FIXE Maximale du buffer d'envoi LoRa
 #define SIZE_URL_HTTPS 200
@@ -261,7 +262,7 @@ void setup() {
     Serial.print(millis());
     Serial.println(";D;Connected to WiFi");
   }
-  client.setCACert(test_root_ca2);
+  //client.setCACert(test_root_ca2);
 }
 
 void loop() {
@@ -696,14 +697,14 @@ extern int sendData(struct pt *pt) {
     Serial.print(millis());
     Serial.print("Requesting URL: ");
     Serial.println(URL_HTTPS);
-  }
+    }
 
-  // This will send the request to the server
-  client.print(String("GET ") + URL + " HTTP/1.1\r\n" +
-             "Host: " + hostServer + "\r\n" +
-             "Connection: close\r\n\r\n");
-    
-    
+    // This will send the request to the server
+    client.print(String("GET ") + URL + " HTTP/1.1\r\n" +
+               "Host: " + hostServer + "\r\n" +
+               "Connection: close\r\n\r\n");
+      
+      
     boolean error = false;
     int timeout = millis();
     while (client.available() == 0 && !error) {
@@ -716,10 +717,11 @@ extern int sendData(struct pt *pt) {
         error = true;
       }
     }
-    
+      
     if(Serial && !error){
       Serial.print(millis());
       Serial.print(";I;Server response");
+      serverfifo.popBuffer(buf, RH_RF95_MAX_MESSAGE_LEN);
     }
     
     // Read all the lines of the reply from server and print them to Serial
