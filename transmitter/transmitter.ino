@@ -16,12 +16,11 @@ uint8_t SENSOR_ID = 4;
 #include <Wire.h>
 #include <OneWire.h>
 #include <SPI.h>
-//#include <QueueList.h>
 #include <avr/dtostrf.h>
 #include "Adafruit_SHT31.h"
 #include "FIFO.h"
 #include "pt.h"
-//#include "JBCDIC.h"
+#include "JBCDIC.h"
 
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
@@ -54,7 +53,6 @@ unsigned long previousMillis=0;
 //Taille FIXE Maximale du buffer d'envoi LoRa
 #define SIZE_BUFFER 100
 uint32_t compteur = 0;
-//QueueList <char> queue;
 FIFO sensorFIFO;
 #define ledPin 13
 #define v_OneWire 12
@@ -62,7 +60,6 @@ FIFO sensorFIFO;
 #define v_Analog1 A4
 #define v_Analog2 A5
 static struct pt sensorAnalysisPT, sendingPT, receivingPT;
-int tmpQueueSize = 0;
 uint8_t tmpBuffer[100];
 
 void setup() {
@@ -509,10 +506,6 @@ extern int sensorAnalysis(struct pt *pt) {
     Serial.println(strlen(buffer_a_envoyer));
   }
   sensorFIFO.pushBuffer((uint8_t*)buffer_a_envoyer, strlen(buffer_a_envoyer));
-  //Serial.println(sensorFIFO.pop());
-  Serial.println(sensorFIFO.size());
-  //Serial.println("1");
-  tmpQueueSize++;
   //Si on est en mode DEBUG, alors on laisse un petit delai
   PT_END(pt);
 }
@@ -528,12 +521,6 @@ static int loRaSending(struct pt *pt) {
     Serial.println("Transmission des données via LoRa (RF95)");
     Serial.println("*****************************************************");
   }
-  Serial.println("2");
-  //char* test = queue.peekBuffer();
-  /*for(int i=0; i<100; i++){
-    Serial.println(test[i], HEX);
-  }*/
-  //Serial.println(*test, HEX);
   
   if (Serial) {Serial.print(millis());}
   //Activation du LoRa
@@ -541,7 +528,6 @@ static int loRaSending(struct pt *pt) {
     if(Serial){Serial.println(";E;LoRa not initialized");}
   } else {
     if(Serial){Serial.println(";I;LoRa initialized");}
-    Serial.println(RH_PLATFORM_STM32);
   }
   if (Serial) {
     Serial.print(millis());
@@ -554,12 +540,19 @@ static int loRaSending(struct pt *pt) {
   radioDriver.setSignalBandwidth(bande_passante_LoRa);
   if (Serial) {Serial.print(millis());}
   if (!(sensorFIFO.isEmpty())) {
-//  uint8_t buf[sensorFIFO.peek()] = 
     sensorFIFO.peekBuffer(tmpBuffer, SIZE_BUFFER);
-    for(int i = 0; i < sensorFIFO.peek(); i++) {
-      Serial.print((char)tmpBuffer[i]);
+    JBCDIC jbcdic;
+    uint8_t tmpBuffer2[SIZE_BUFFER];
+    int counter = jbcdic.encode_to_jbcdic((char*)tmpBuffer, sensorFIFO.peek(), tmpBuffer2, SIZE_BUFFER);
+    Serial.println("*******************");
+    Serial.println(counter);
+    for(int i = 0; i < strlen((char*)tmpBuffer2); i++) {
+      Serial.print((char)tmpBuffer2[i]);
     }
-    if(rhRDatagram.sendtoWait(tmpBuffer, sensorFIFO.peek(), SERVER_ADDRESS)) {
+    Serial.println("");
+    Serial.println("*******************");
+    
+    if(rhRDatagram.sendtoWait(tmpBuffer2, sensorFIFO.peek(), SERVER_ADDRESS)) {
       sensorFIFO.popBuffer(tmpBuffer, SIZE_BUFFER);
       if (Serial) {Serial.println(";I;Packet sent");}
       // Now wait for a reply from the server
@@ -581,15 +574,6 @@ static int loRaSending(struct pt *pt) {
         Serial.println(";W;Packet not sent");
         Serial.println(sensorFIFO.size());
       }
-    }
-  }
-  if(sensorFIFO.size() >= 47 * 5) {
-    while(!(sensorFIFO.isEmpty())) {
-      sensorFIFO.popBuffer(tmpBuffer, 100);
-      for(int i = 0; i < sensorFIFO.peek(); i++) {
-        Serial.print((char)tmpBuffer[i]);
-      }
-      Serial.println("");
     }
   }
   PT_END(pt);
