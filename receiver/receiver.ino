@@ -8,7 +8,7 @@
 #include <RH_RF95.h>
 #include <WiFiClientSecure.h>
 #include <WiFiClient.h>
-#include <IotWebConf.h>
+#include "IotWebConf.h"
 #include "FIFO.h"
 #include "RTClib.h"
 #include "JBCDIC.h"
@@ -576,11 +576,11 @@ extern int receiving(struct pt *pt) {
       buf[len] = '\0';
       int sz = JBCDIC::decode_from_jbcdic(buf, len, buf2, RH_RF95_MAX_MESSAGE_LEN);
       buf2[sz] = '\0';
-      RH_RF95::printBuffer("Données recues [HEXA]: ", (uint8_t *)buf2, len);
+      RH_RF95::printBuffer("Données recues [HEXA]: ", (uint8_t *)buf2, sz);
       if(Serial) {
         Serial.print(millis());
         Serial.print(";I;Received datas [Texte]: ");
-        for(int i =0; i < len; i++){
+        for(int i =0; i < sz; i++){
             Serial.print(buf2[i]); 
         }
         Serial.print(";RSSI: ");

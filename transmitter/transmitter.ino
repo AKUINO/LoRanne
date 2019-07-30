@@ -18,8 +18,8 @@ uint8_t SENSOR_ID = 4;
 #include <SPI.h>
 #include <avr/dtostrf.h>
 #include "Adafruit_SHT31.h"
-#include "FIFO.h"
 #include "pt.h"
+#include "FIFO.h"
 #include "JBCDIC.h"
 
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
