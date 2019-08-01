@@ -9,17 +9,16 @@
 Programme de check-up + envoie des données sur le GateWay via LoRa
 
 */
-#define CLIENT_ADDRESS 4
 #define SERVER_ADDRESS 120
-uint8_t SENSOR_ID = 4;
+#define SENSOR_ID 4
 
 #include <Wire.h>
 #include <OneWire.h>
 #include <SPI.h>
 #include <avr/dtostrf.h>
 #include "Adafruit_SHT31.h"
-#include "pt.h"
 #include "FIFO.h"
+#include "pt.h"
 #include "JBCDIC.h"
 
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
@@ -28,7 +27,7 @@ Adafruit_SHT31 sht31 = Adafruit_SHT31();
 uint8_t slaveSelectPin = 8, interruptPin = 3;
 RH_RF95 radioDriver(slaveSelectPin, interruptPin);
 #include <RHReliableDatagram.h>
-RHReliableDatagram rhRDatagram(radioDriver, CLIENT_ADDRESS);
+RHReliableDatagram rhRDatagram(radioDriver, SENSOR_ID);
 
 /////////////////////////////
 //Déclaration des sorties
@@ -546,127 +545,23 @@ static int loRaSending(struct pt *pt) {
     int counter = jbcdic.encode_to_jbcdic((char*)tmpBuffer, sensorFIFO.peek(), tmpBuffer2, SIZE_BUFFER);
     Serial.println("*******************");
     Serial.println(counter);
-    for(int i = 0; i < strlen((char*)tmpBuffer2); i++) {
+    for(int i = 0; i < counter; i++) {
       Serial.print((char)tmpBuffer2[i]);
     }
     Serial.println("");
     Serial.println("*******************");
     
-    if(rhRDatagram.sendtoWait(tmpBuffer2, sensorFIFO.peek(), SERVER_ADDRESS)) {
+    if(rhRDatagram.sendtoWait(tmpBuffer2, counter, SERVER_ADDRESS)) {
       sensorFIFO.popBuffer(tmpBuffer, SIZE_BUFFER);
       if (Serial) {Serial.println(";I;Packet sent");}
       // Now wait for a reply from the server
-      uint8_t len = sizeof(buf);
-      uint8_t from;
-      if (rhRDatagram.recvfromAckTimeout(buf, &len, 2000, &from)) {
-        buf[len] = '\0';
-        Serial.print("got reply from : 0x");
-        Serial.print(from, HEX);
-        Serial.print(": ");
-        Serial.println((char*)buf);
-      }
-      else {
-        Serial.println("No reply, is rf95_reliable_datagram_server running?");
-      }
     }
     else{
       if (Serial) {
-        Serial.println(";W;Packet not sent");
+        Serial.println(";W;Packet not received");
         Serial.println(sensorFIFO.size());
       }
     }
   }
   PT_END(pt);
 }
-
-/*extern int receiving(struct pt *pt) {
-  PT_BEGIN(pt);
-  PT_WAIT_UNTIL(pt, sensorFIFO.size() < tmpQueueSize);
-  //PT_WAIT_UNTIL(pt, sensorFIFO.size() < tmpQueueSize);
-  //Délai d'attente d'une réponse LoRa (par defaut : 5 secondes)
-  int delai_reponse_LoRa = 1;
-  long duree_attente_aleatoire;
-  tmpQueueSize--;
-  //On attend que le packet ait bien été envoyé...
-  // Maintenant, on attend une éventuelle réponse de notre GateWay
-  uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-  uint8_t len = sizeof(buf);
-  uint8_t from;
-  uint16_t timeout = 5000;
-  char verification[4];
-  char tmp[1];
-  dtostrf(SENSOR_ID, -1, 0, tmp);
-  snprintf(verification, 4, "%s%s", "M=", tmp);
-
-  if (rhRDatagram.waitAvailableTimeout(delai_reponse_LoRa*1000)) {
-    // Should be a reply message for us now
-    if (rhRDatagram.recvfromAckTimeout(buf, &len, timeout, &from)) {
-      if(Serial) {
-        Serial.print(millis());
-        Serial.print(";D;Response Received");
-        Serial.print(";RSSI: ");
-        Serial.print(radioDriver.lastRssi(), DEC);
-        RH_RF95::printBuffer(";Received datas [HEXA]: ", buf, len);
-      }
-      //On vide le buffer_a_envoyer car il a bien été recu...
-      //memset(buffer_a_envoyer, 0, sizeof(buffer_a_envoyer));
-
-      //On traite la réponse reçue via notre fonction de traitement de données recues
-      //analyse_datas_recues((char*)buf);
-      //On verifie si le recepteur a bien recu notre réponse...
-      if (String((char*)buf) == verification) {
-        if (Serial) {
-          Serial.print(millis());
-          Serial.println(";D;GATEWAY got response");
-        }
-        delay(5000); // PROTOTHREAD
-      }
-      else {
-        if (Serial) {
-          Serial.print(millis());
-          Serial.println(";W;Interference");
-        }
-        //on attend une durée aléatoire avant de renvoyé!
-        duree_attente_aleatoire = random(1000,15000);
-        if (Serial) {
-          Serial.print("on attend ");
-          Serial.print(duree_attente_aleatoire);
-          Serial.println("ms avant de re envoyé...");
-        }
-        delay(duree_attente_aleatoire); // PROTOTHREAD
-        if (Serial) {
-          Serial.println(verification);
-          Serial.println("On envoie...");
-        }
-        //char* buffer_a_envoyer = removeFromFIFO(sensorFIFO);
-        sensorFIFO.peekBuffer(tmpBuffer, 100);
-        for(int i = 0; i < sensorFIFO.peek(); i++) {
-          Serial.print((char)tmpBuffer[i]);
-        }
-        if(rhRDatagram.sendtoWait(tmpBuffer, sensorFIFO.peek(), SERVER_ADDRESS)) { // PROTOTHREAD
-          if(Serial){
-            Serial.print(millis());
-            Serial.println(";D;Packet sent");
-          }
-          for(int i = 0; i < sensorFIFO.peek(); i++) {sensorFIFO.pop();}
-        }
-        else {
-          Serial.println(";W;Packet not sent");
-        }
-      }
-    }
-    else {
-      if (Serial) {
-        Serial.print(millis());
-        Serial.println(";W;Listening Problem");
-      }
-    }
-  }
-  else {
-    if (Serial) {
-      Serial.print(millis());
-      Serial.println(";W;No response");
-    }
-  }
-  PT_END(pt);
-}*/
