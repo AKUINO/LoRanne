@@ -1,28 +1,35 @@
 #include "FS.h"
-#include "pt.h"
 #include "SD.h"
 #include "SPI.h"
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-#include <RH_RF95.h>
 #include <WiFiClientSecure.h>
 #include <WiFiClient.h>
-#include "IotWebConf.h"
-#include "FIFO.h"
 #include "RTClib.h"
+#include "pt.h"
+#include "RH_RF95.h"
+#include "RHReliableDatagram.h"
+#include "FIFO.h"
+// We are not encoding JSON but URL ...
 #include "JBCDIC.h"
+#include "IotWebConf.h"
 
-#if defined(ARDUINO_ARCH_SAMD)
-   #define Serial SerialUSB
-#endif
+// PHENICS is not supporting HTTPS
+#undef __HTTPS__
 
+// LoRa Network Address
+#define SERVER_ADDRESS 120
+
+//TODO: For Arduino MKR Wifi 1010 + MKR 1300 LoRa + MKR Mem Shield, we will have to decide...
+// When stacking ADAFruit boards (ESP32, OLED, RTC+SD card, LoRa board), PCF8523 is the RTC used
 RTC_PCF8523 rtc;
+//TODO: For Arduino MKR Wifi 1010 + MKR 1300 LoRa + MKR Mem Shield, we will have to decide...
 
-char daysOfTheWeek[7][12] = {"Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"};
-
+//TODO: For Arduino MKR ?
 Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 
+//TODO: For Arduino MKR ?
 // OLED FeatherWing buttons map to different pins depending on board:x  
 #if defined(ESP8266)
   #define BUTTON_A  0
@@ -50,22 +57,23 @@ Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
   #define BUTTON_C  5
 #endif
 
-#define RFM95_RST     27
-#define RFM95_CS      14 
-#define RFM95_INT     32
-#define SERVER_ADDRESS 120
-#define CLIENT_ADRRESS 4
-#define HTTP_PORT 80
-
-#define STRING_LEN 128
-#define CONFIG_VERSION "dem2"
-
+//TODO: For Arduino MKR ?
+// ARDUINO_STM32_FEATHER
 #define CONFIG_PIN 15
 #define STATUS_PIN 13
 
-// Change to 434.0 or other frequency, must match RX's freq!
-#define RF95_FREQ frequence_LoRa
+//TODO: For Arduino MKR ?
+// ARDUINO_STM32_FEATHER
+#define RFM95_RST     27
+#define RFM95_CS      14 
+#define RFM95_INT     32
 
+// IotWebConf:
+#define HTTP_PORT 80
+#define STRING_LEN 128
+#define CONFIG_VERSION "dem2"
+
+// LoRa:
 //Fréquence d'utilisation (par defaut 869.35 MHz)
 float frequence_LoRa = 869.35;
 //Bande passante utilisée (par defaut : 62,5 KHz)
@@ -75,11 +83,8 @@ uint8_t puissance_signal_LoRa = 10;
 
 // Singleton instance of the radio driver
 RH_RF95 radioDriver(RFM95_CS, RFM95_INT);
-#include <RHReliableDatagram.h>
 
 RHReliableDatagram rhRDatagram(radioDriver, SERVER_ADDRESS);
-
-//const char*  server = "http://phenics.gembloux.ulg.ac.be";
 
 //Certificat SSL LOCAL
 const char* test_root_ca2= \
@@ -121,25 +126,23 @@ const char* test_root_ca2= \
 "/A3hZ+wpT3sK6uWF/fenyZNt4/mgxoSbkYS/uaI5HSMD\n" \
 "-----END CERTIFICATE-----\n";
 
+#if __HTTPS__
+WiFiClientSecure client;
+#else
 WiFiClient client;
+#endif
 
 //Taille FIXE Maximale du buffer d'envoi LoRa
 #define SIZE_URL_HTTPS 200
 //Variable a envoyer via LoRa
 char URL_HTTPS[SIZE_URL_HTTPS];
 
-String URL;
-String Date;
-String buffer_recu;
-String ID_recu;
 static struct pt receivingPT, sendDataPT;
 
 const char thingName[] = "Akuino";
 const char wifiInitialApPassword[] = "12345678";
 
 char hostServer[STRING_LEN];
-IotWebConfParameter iwcHostServer;
-
 boolean formValidator();
 void configSaved();
 
@@ -149,8 +152,11 @@ WebServer server(80);
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
 
 FIFO serverfifo;
+
+char daysOfTheWeek[7][12] = {"Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"};
+
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   
   iotWebConf.setStatusPin(STATUS_PIN);
   iotWebConf.setConfigPin(CONFIG_PIN);
@@ -163,12 +169,12 @@ void setup() {
   server.on("/config", []{ iotWebConf.handleConfig(); });
   server.onNotFound([](){ iotWebConf.handleNotFound(); });
 
+//TODO: For Arduino MKR ?
   if (! rtc.begin()) {
     if(Serial) {
       Serial.print(millis());
       Serial.println(";E;Couldn't find RTC");
     }
-    while (1);
   }
 
   if (! rtc.initialized()) {
@@ -183,23 +189,38 @@ void setup() {
     // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
 
+//TODO: For Arduino MKR ?
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
   display.display();
   delay(1000);
 
+//TODO: For Arduino MKR ?
+//#ifdef ARDUINO_SAMD_MKRWAN1300
+//  pinMode(LORA_IRQ_DUMB, OUTPUT);
+//  digitalWrite(LORA_IRQ_DUMB, LOW);
+//
+//  // Hardware reset
+//  pinMode(LORA_BOOT0, OUTPUT);
+//  digitalWrite(LORA_BOOT0, LOW);
+//
+//  pinMode(LORA_RESET, OUTPUT);
+//  digitalWrite(LORA_RESET, HIGH);
+//  delay(200);
+//  digitalWrite(LORA_RESET, LOW);
+//  delay(200);
+//  digitalWrite(LORA_RESET, HIGH);
+//  delay(50);
+//#endif
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
- 
-  Serial.begin(9600);
-  
   delay(100);
 
   // manual reset
   digitalWrite(RFM95_RST, LOW);
   delay(10);
   digitalWrite(RFM95_RST, HIGH);
+  
   delay(10);
-  strncpy(hostServer, iotWebConf.getHostName(), STRING_LEN);
   while (!rhRDatagram.init()) {
     if(Serial) {
       Serial.print(millis());
@@ -211,13 +232,16 @@ void setup() {
     Serial.println(";I;LoRa initialized");
   }
 
-
   radioDriver.setFrequency(frequence_LoRa);
   radioDriver.setTxPower(puissance_signal_LoRa);
   radioDriver.setSignalBandwidth(bande_passante_LoRa);
 
   delay(1000);
 
+  PT_INIT(&receivingPT);
+  PT_INIT(&sendDataPT);
+  
+//TODO: For Arduino MKR ?
   if(!SD.begin(33)){
     if(Serial) {
       Serial.print(millis());
@@ -254,15 +278,6 @@ void setup() {
     Serial.print(millis());
     Serial.printf(";SD storage size : %lluMB\n", cardSize);
   }
-  
-  PT_INIT(&receivingPT);
-  PT_INIT(&sendDataPT);
-  
-  if(Serial) {
-    Serial.print(millis());
-    Serial.println(";D;Connected to WiFi");
-  }
-  //client.setCACert(test_root_ca2);
 }
 
 void loop() {
@@ -297,16 +312,6 @@ boolean formValidator() {
     Serial.print(";D;Validating form");
   }
 
-  int num_args = server.arg(iwcHostServer.getId()).length();
-  (server.arg(iwcHostServer.getId())).toCharArray(hostServer , STRING_LEN);
-  if(Serial) {
-    Serial.print(";Host : ");
-    Serial.println(hostServer );
-  }
-  if (num_args < 3) {
-    iwcHostServer.errorMessage = "Please provide at least 3 characters for this test!";
-    return false;
-  }
   return true;
 }
 
@@ -556,25 +561,24 @@ void testFileIO(fs::FS &fs, const char * path){
   file.close();
 }
 
-
 extern int receiving(struct pt *pt) {
   PT_BEGIN(pt);
-  PT_WAIT_UNTIL(pt, (1 == 1));
+//  PT_WAIT_UNTIL(pt, (1 == 1));
   if (rhRDatagram.available()) {
     // Should be a message for us now
+    char buf2[SIZE_URL_HTTPS];
     uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-    char buf2[RH_RF95_MAX_MESSAGE_LEN];
     uint8_t len = RH_RF95_MAX_MESSAGE_LEN;
     uint16_t timeout = 5000;
     uint8_t from;
-    rhRDatagram.waitAvailable();
+    //rhRDatagram.waitAvailable();
     if (rhRDatagram.recvfromAckTimeout(buf, &len, timeout, &from)) {
       if(Serial) {
         Serial.print(millis());
         Serial.println(";I;Message received");
       }
       buf[len] = '\0';
-      int sz = JBCDIC::decode_from_jbcdic(buf, len, buf2, RH_RF95_MAX_MESSAGE_LEN);
+      int sz = JBCDIC::decode_from_jbcdic(buf, len, buf2, SIZE_URL_HTTPS);
       buf2[sz] = '\0';
       RH_RF95::printBuffer("Données recues [HEXA]: ", (uint8_t *)buf2, sz);
       if(Serial) {
@@ -607,17 +611,15 @@ extern int receiving(struct pt *pt) {
         Serial.print(now.second(), DEC);
         Serial.println();
         Serial.print(millis());
-        Serial.print(";D;Sending response to ");
-        Serial.println(ID_recu);
       }
       
-      if(rhRDatagram.sendtoWait((uint8_t *)buf2, sz, from)) {
-        if(Serial) {
-          Serial.print(millis());
-          Serial.print(";D;Response sent");
-          Serial.println(";Saving data on micro-SD");
-        }
-      }
+//      if(rhRDatagram.sendtoWait((uint8_t *)buf2, sz, from)) {
+//        if(Serial) {
+//          Serial.print(millis());
+//          Serial.print(";D;Response sent");
+//          Serial.println(";Saving data on micro-SD");
+//        }
+//      }
       appendFile(SD, "/sauvegarde.txt", buf2);
       
       display.clearDisplay();
@@ -638,7 +640,6 @@ extern int receiving(struct pt *pt) {
         Serial.println(hostServer );
       }
       unsigned long ttl = millis();
-      //WiFiClient client;
 
       ///////////////////////////////////////////
       //On envoie au serveur ELSA
@@ -679,13 +680,17 @@ extern int sendData(struct pt *pt) {
     Serial.println(";I;Sending data on both servers (ELSA + SERVEUR LOCAL)");
   }
   uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-  char buf2[RH_RF95_MAX_MESSAGE_LEN];
+  char buf2[SIZE_URL_HTTPS];
   
   serverfifo.peekBuffer(buf, RH_RF95_MAX_MESSAGE_LEN);
-  int count = snprintf(buf2, RH_RF95_MAX_MESSAGE_LEN, "/api/kv?R=%s", (char*)buf);
-  URL=String(buf2);
+  int count = snprintf(buf2, SIZE_URL_HTTPS, "/api/kv?R=%s", (char*)buf);
+
   // Use WiFiClient class to create TCP connections
 
+  strncpy(hostServer, iotWebConf.getHostName(), STRING_LEN);
+#ifdef __HTTPS__
+  client.setCACert(test_root_ca2);
+#endif
   if (!client.connect(hostServer , HTTP_PORT)) {
     if(Serial) {
       Serial.print(millis());
@@ -700,11 +705,13 @@ extern int sendData(struct pt *pt) {
     }
 
     // This will send the request to the server
-    client.print(String("GET ") + URL + " HTTP/1.1\r\n" +
-               "Host: " + hostServer + "\r\n" +
-               "Connection: close\r\n\r\n");
-      
-      
+    client.print("GET ");
+    client.print(buf2);
+    client.print(" HTTP/1.1\r\n");
+    client.print("Host: ");
+    client.print(hostServer);
+    client.print("\r\nConnection: close\r\n\r\n");
+
     boolean error = false;
     int timeout = millis();
     while (client.available() == 0 && !error) {
