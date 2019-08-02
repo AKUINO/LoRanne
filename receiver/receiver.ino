@@ -2,34 +2,50 @@
 #include "SD.h"
 #include "SPI.h"
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include <WiFiClientSecure.h>
-#include <WiFiClient.h>
-#include "RTClib.h"
 #include "pt.h"
-#include "RH_RF95.h"
-#include "RHReliableDatagram.h"
 #include "FIFO.h"
 // We are not encoding JSON but URL ...
 #include "JBCDIC.h"
-#include "IotWebConf.h"
-
-// PHENICS is not supporting HTTPS
-#undef __HTTPS__
 
 // LoRa Network Address
 #define SERVER_ADDRESS 120
 
-//TODO: For Arduino MKR Wifi 1010 + MKR 1300 LoRa + MKR Mem Shield, we will have to decide...
-// When stacking ADAFruit boards (ESP32, OLED, RTC+SD card, LoRa board), PCF8523 is the RTC used
-RTC_PCF8523 rtc;
-//TODO: For Arduino MKR Wifi 1010 + MKR 1300 LoRa + MKR Mem Shield, we will have to decide...
+#ifdef ARDUINO_SAMD_MKRWAN1300
+  // no screen, no Wifi but LoRa
+  #include "RH_RF95.h"
+  #include "RHReliableDatagram.h"
+#elif ARDUINO_FEATHER_ESP32
+  #include <Adafruit_GFX.h>
+  #include <Adafruit_SSD1306.h>
+  #include "RTClib.h"
+  #include <WiFiClientSecure.h>
+  #include <WiFiClient.h>
+  #include "RH_RF95.h"
+  #include "RHReliableDatagram.h"
+  #include "IotWebConf.h"
 
-//TODO: For Arduino MKR ?
-Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
+  // When stacking ADAFruit boards (ESP32, OLED, RTC+SD card, LoRa board), PCF8523 is the RTC used
+  RTC_PCF8523 rtc;
+  Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 
-//TODO: For Arduino MKR ?
+  #define RFM95_RST     27
+  #define RFM95_CS      14 
+  #define RFM95_INT     32
+
+  // Singleton instance of the radio driver
+  RH_RF95 radioDriver(RFM95_CS, RFM95_INT);
+  
+  RHReliableDatagram rhRDatagram(radioDriver, SERVER_ADDRESS);
+#elif ARDUINO_M5Stack_Core_ESP32
+  // No LoRa and Another type of screen...
+  #include <WiFiClientSecure.h>
+  #include <WiFiClient.h>
+  #include "IotWebConf.h"
+#endif
+
+// PHENICS is not supporting HTTPS
+#undef __HTTPS__
+
 // OLED FeatherWing buttons map to different pins depending on board:x  
 #if defined(ESP8266)
   #define BUTTON_A  0
@@ -62,12 +78,6 @@ Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 #define CONFIG_PIN 15
 #define STATUS_PIN 13
 
-//TODO: For Arduino MKR ?
-// ARDUINO_STM32_FEATHER
-#define RFM95_RST     27
-#define RFM95_CS      14 
-#define RFM95_INT     32
-
 // IotWebConf:
 #define HTTP_PORT 80
 #define STRING_LEN 128
@@ -80,11 +90,6 @@ float frequence_LoRa = 869.35;
 long bande_passante_LoRa = 62500;
 //Puissance utilisée (par defaut : 10 mW)
 uint8_t puissance_signal_LoRa = 10;
-
-// Singleton instance of the radio driver
-RH_RF95 radioDriver(RFM95_CS, RFM95_INT);
-
-RHReliableDatagram rhRDatagram(radioDriver, SERVER_ADDRESS);
 
 //Certificat SSL LOCAL
 const char* test_root_ca2= \
@@ -455,7 +460,7 @@ void appendFile(fs::FS &fs, const char * path, const char * message){
   if(!file){
     if(Serial) {
       Serial.print(millis());
-      Serial.println("File opening failure");
+      Serial.println(";W;File opening failure");
     }
     return;
   }
@@ -633,7 +638,7 @@ extern int receiving(struct pt *pt) {
       display.setCursor(0,0);
       display.display(); // actually display all of the above
       
-      int16_t RSSI_SENSOR = radioDriver.lastRssi()*-1;
+      int16_t RSSI_sensor = radioDriver.lastRssi()*-1;
       if(Serial) {
         Serial.print(millis());
         Serial.print(";D;Host : ");
@@ -644,7 +649,7 @@ extern int receiving(struct pt *pt) {
       ///////////////////////////////////////////
       //On envoie au serveur ELSA
       //////////////////////////////////////////
-      int count = snprintf(URL_HTTPS, SIZE_URL_HTTPS, "%u&%s", RSSI_SENSOR, buf2);
+      int count = snprintf(URL_HTTPS, SIZE_URL_HTTPS, "%d&M=%u&%s", RSSI_sensor, from, buf2);
       
       Serial.print(millis());
       if(serverfifo.pushBuffer((uint8_t*)URL_HTTPS,count)){
@@ -700,7 +705,7 @@ extern int sendData(struct pt *pt) {
   else{
     if(Serial) {
     Serial.print(millis());
-    Serial.print("Requesting URL: ");
+    Serial.print(";D;Requesting URL: ");
     Serial.println(URL_HTTPS);
     }
 
@@ -718,7 +723,7 @@ extern int sendData(struct pt *pt) {
       if ((millis() - timeout) > 5000) {
         if(Serial) {
           Serial.print(millis());
-          Serial.println(";W;Client Timeout -  FLIIIP");
+          Serial.println(";W;Web Application Timeout");
         }
         client.stop();
         error = true;

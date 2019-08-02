@@ -9,8 +9,9 @@
 Programme de check-up + envoie des données sur le GateWay via LoRa
 
 */
-#define SERVER_ADDRESS 120
+// Could be an interactive compilation parameter
 #define SENSOR_ID 4
+#define SERVER_ADDRESS 120
 
 #include <Wire.h>
 #include <OneWire.h>
@@ -22,20 +23,57 @@ Programme de check-up + envoie des données sur le GateWay via LoRa
 #include "JBCDIC.h"
 
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
-
 #include <RH_RF95.h>
-uint8_t slaveSelectPin = 8, interruptPin = 3;
-RH_RF95 radioDriver(slaveSelectPin, interruptPin);
+
+// From Arduino library Lora.h
+#ifdef ARDUINO_SAMD_MKRWAN1300
+#define LORA_DEFAULT_SPI           SPI1
+#define LORA_DEFAULT_SPI_FREQUENCY 250000
+#define LORA_DEFAULT_SS_PIN        LORA_IRQ_DUMB
+#define LORA_DEFAULT_RESET_PIN     -1
+#define LORA_DEFAULT_DIO0_PIN      -1
+#elif ADAFRUIT_FEATHER_M0
+#define LORA_DEFAULT_SPI           SPI
+#define LORA_DEFAULT_SPI_FREQUENCY 8E6 
+#define LORA_DEFAULT_SS_PIN        8
+#define LORA_DEFAULT_RESET_PIN     -1
+#define LORA_DEFAULT_DIO0_PIN      3
+#else
+#define LORA_DEFAULT_SPI           SPI
+#define LORA_DEFAULT_SPI_FREQUENCY 8E6 
+#define LORA_DEFAULT_SS_PIN        10
+#define LORA_DEFAULT_RESET_PIN     9
+#define LORA_DEFAULT_DIO0_PIN      2
+#endif
+
+RH_RF95 radioDriver(LORA_DEFAULT_SS_PIN, LORA_DEFAULT_DIO0_PIN);
 #include <RHReliableDatagram.h>
 RHReliableDatagram rhRDatagram(radioDriver, SENSOR_ID);
 
 /////////////////////////////
 //Déclaration des sorties
 /////////////////////////////
+#ifdef ARDUINO_SAMD_MKRWAN1300
+  //Sortie du 1-Wire
+  #define ONEWIRE_OUTPUT ???
+  #define ledPin ???
+  #define v_OneWire ???
+  #define v_I2C ???
+  #define v_Analog1 ???
+  #define v_Analog2 ???
+  #define VBATPIN ???
+#elif ADAFRUIT_FEATHER_M0
+  //Sortie du 1-Wire
+  #define ONEWIRE_OUTPUT 5
+  #define ledPin 13
+  #define v_OneWire 12
+  #define v_I2C 11
+  #define v_Analog1 A4
+  #define v_Analog2 A5
+  #define VBATPIN A7
+#endif
 
-//Sortie du 1-Wire
-int oneWireOutput = 5;
-OneWire  ds(oneWireOutput);
+OneWire  ds(ONEWIRE_OUTPUT);
 
 ///////////////////////////////////////
 //Déclaration des variables
@@ -53,15 +91,13 @@ unsigned long previousMillis=0;
 #define SIZE_BUFFER 100
 uint32_t compteur = 0;
 FIFO sensorFIFO;
-#define ledPin 13
-#define v_OneWire 12
-#define v_I2C 11
-#define v_Analog1 A4
-#define v_Analog2 A5
+
 static struct pt sensorAnalysisPT, sendingPT, receivingPT;
-uint8_t tmpBuffer[100];
+uint8_t tmpBuffer[SIZE_BUFFER];
 
 void setup() {
+  // Log terminal (high speed)
+  Serial.begin(115200);
   //Alimentation(Vcc) de la LED
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, LOW);
@@ -79,7 +115,6 @@ void setup() {
   digitalWrite(v_Analog2, LOW);
   //On démarre le 1-Wire
   Wire.begin();
-  #define VBATPIN A7
   PT_INIT(&sensorAnalysisPT);
   PT_INIT(&sendingPT);
   PT_INIT(&receivingPT);
@@ -105,9 +140,6 @@ void setup() {
 }
 
 void loop() {
-  Serial.begin(115200);
-  Serial1.begin(115200);
-  delay(2500);
   //Fréquence d'échantillonnage en min (par defaut : 15min)
   float periode_echantillon = 6; // in seconds
 
@@ -220,11 +252,10 @@ extern int sensorAnalysis(struct pt *pt) {
   ////////////////////////////////////////
   PT_WAIT_UNTIL(pt, (millis() >= (previousMillis + 30000)) || (millis() < 30000));
   //Variable a envoyer via LoRa
-  char buffer_a_envoyer[100]="";
+  char buffer_a_envoyer[SIZE_BUFFER]="";
   Serial.println(buffer_a_envoyer);
   Serial.println(strlen(buffer_a_envoyer));
   //pourcentage de la batterie
-  float SENSOR_BATTERY;
   byte error, address;
   int nDevices;
   float fonction_return_value;
@@ -236,15 +267,11 @@ extern int sensorAnalysis(struct pt *pt) {
   measuredvbat *= 2;    // we divided by 2, so multiply back
   measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
   measuredvbat /= 1024; // convert to voltage
-  SENSOR_BATTERY=measuredvbat;
-  dtostrf(SENSOR_ID, -1, 0, v1_string);
-  snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "M=%s", v1_string);
   //On écrit le header(en-tête) du buffer_a_envoyer + Niveau de batterie
   //le "moins" permet d'écrire à gauche
-  dtostrf(SENSOR_BATTERY, -5, 3, v1_string);
-  snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "&B=%s", v1_string);
-
-//end if
+  dtostrf(measuredvbat, -5, 3, v1_string);
+  // 1st piece of data, no "&" before field code...
+  snprintf(&buffer_a_envoyer[strlen(buffer_a_envoyer)], SIZE_BUFFER - strlen(buffer_a_envoyer), "B=%s", v1_string);
 
   ////////////////////////////////////////////////
   //Analyse et lecture des analogiques disponibles
@@ -504,6 +531,9 @@ extern int sensorAnalysis(struct pt *pt) {
     Serial.println(buffer_a_envoyer);
     Serial.println(strlen(buffer_a_envoyer));
   }
+  // Serial peripheral (low speed)
+  //Serial1.begin(9600);
+  // MANAGE SERIAL READ...
   sensorFIFO.pushBuffer((uint8_t*)buffer_a_envoyer, strlen(buffer_a_envoyer));
   //Si on est en mode DEBUG, alors on laisse un petit delai
   PT_END(pt);
