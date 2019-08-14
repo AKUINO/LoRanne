@@ -13,9 +13,9 @@ The configuration needed is minimal:
 
 The peripherals are automatically detected (1-Wire, I2C). Some may have to be configured (Analog or serial inputs). This is done through a wizard (sequence of questions with current answers provided by defaults).
 
-Radio messages are buffered and exchanged in compressed JSON format (see project [JBCDIC](https://github.com/AKUINO/JBCDIC/blob/master/README.md)).
+Radio messages are buffered and exchanged in compressed URL format (see project [JBCDIC](https://github.com/AKUINO/JBCDIC/blob/master/README.md), aimed at compressiong JSON, used to compress URLs).
 
-The transmitter is based on the Adafruit Feather M0 with a LoRa transmitter (https://www.adafruit.com/product/3178). We add an underlying board to ease connections to sensors and to selectively power them. The following table explains the pinout:
+The transmitter is currently based on the Adafruit Feather M0 with a LoRa transmitter (https://www.adafruit.com/product/3178) but next version will be based on Arduino MKR WAN 1300. We add an underlying board to ease connections to sensors and to selectively power them. The following table explains the pinout:
 
 Connector|Code|Data Pin|Power Activation Pin|Remark
 ---------|----|--------|--------------------|------
@@ -50,9 +50,9 @@ Detailed Eagle schema and board definition are in this directory.
 
 ## Data transmitted
 
-Data is encoded using JBCIC ( https://github.com/AKUINO/JBCDIC ). A message is made of one or more measurement sessions up to the LoRa maximum size (53 bytes in our case).
+Data is encoded as an URL using JBCDIC ( https://github.com/AKUINO/JBCDIC ). A message is made of only one (for now) session of measures up to the LoRa maximum size (53 bytes in our case).
 
-One measurements session is a JSON object (a message is implicitely an array of JSON objects) with the following properties:
+One measurements session is a URL (in the future: a JSON object) with the following properties:
 
 Property|Connection|Pin|Description
 --------|----------|---|-----------
