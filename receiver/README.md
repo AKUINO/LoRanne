@@ -23,6 +23,17 @@ The receiver is a simple stack of the following AdaFruit boards (from bottom to 
 
 The enclosure is big enough to guest a 18650 battery for continuous operation even during a long power breakdown.
 
+To have "CE" marked hardware, we will be using M5Stack Core module in the future. It integrates in a sleek package:
+
+    USB Type-C connector (Power and Programming)
+    ESP32-based: 4 MByte flash + 520K RAM
+    Speaker, 3 Buttons, Color LCD(320*240), 1 Reset
+    WiFi 2.4G Antenna: Proant 440
+    SD card slot (16G Maximum size)
+    Battery Socket & 150 mAh Lipo Battery
+    Bus Extension Pins & Holes
+    Grove Port
+
 ### Pinout
 
 PCB Pin|ESP32 Pin|Remark
@@ -60,9 +71,9 @@ SDA|SDA|I2C Data (no pull-up). OLED address=0x3C. RTC address=0x68
 ## Software
 
 The software is a mirror of the one used by the transmitter. It must:
-1. answer to connecting transmitters and provide them the date/time (1 second precision, 32 bits number starting 01/01/2019)
-2. assign a reduced numerical id for every string (name, 1-Wire ID, I2C peripheral, etc.) submitted by a transmitter: this allows compression of strings that may need to be transmitted by Radio. If the receiver fails, the transmitters can provide their local part of the dictionary when it restarts.
-3. it retrieves sensors configuration (for the parameters needed to be known locally if any) from the ELSA web application. Those parameters are archived on the SD card in case of Internet failure. Amongst those parameters, alarm levels for some sensors, set points for opening/closing valves or switches, etc.
+1. acknowledge data received to connecting transmitters (RadioHead Datagrams)
+2. TO EVALUATE: assign a reduced numerical id for every string (name, 1-Wire ID, I2C peripheral, etc.) submitted by a transmitter: this allows compression of strings that may need to be transmitted by Radio. If the receiver fails, the transmitters can provide their local part of the dictionary when it restarts.
+3. TODO: it retrieves sensors configuration (for the parameters needed to be known locally if any) from the ELSA web application. Those parameters are archived on the SD card in case of Internet failure. Amongst those parameters, alarm levels for some sensors, set points for opening/closing valves or switches, etc.
 4. it sends data to the ELSA web application (also archived on the SD card)
 
 
