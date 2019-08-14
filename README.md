@@ -10,10 +10,11 @@ Receiver(s) (powered, collecting transmitted data, archiving it locally, transmi
 
 General design considerations:
 
-* AdaFruit Feather M0: https://www.adafruit.com/product/3179
+* Transmitters: Arduino MKR WAN 1300 https://store.arduino.cc/mkr-wan-1300 (was AdaFruit Feather M0: https://www.adafruit.com/product/3179 but AdaFruit products are rarely certified "CE")
+* Receiver: for transmitters, we are also switching to an integrated "CE" marked product, M5STACK Code Module: https://m5stack.com/collections/m5-core
 * 1-Wire sensors have the advantage of being self-identified, "hot-pluggable" and could be connected to one sensor node or another: https://www.maximintegrated.com/en/app-notes/index.mvp/id/4206
   * Serial adapter for 1-Wire gives better reliability than bit-banging (e.g. https://www.mikroe.com/uart-1-wire-click ) but requires 5V. As most 1-Wire devices are happy (but sometimes slower) at 3.3V, fewer devices not too far away will make bit-banging possible.
-  * Thermocron (IButton: https://be.farnell.com/fr-BE/c/semiconducteurs-circuits-integres/memoires/accessoires-iboutons/iboutons ) can receive a "mission" and record temperature OFF-LINE for very long period of time: they can be used to ensure cold-chain continuity during transportation. They can even be programmed by a remote radio module: http://arduinofun.blogspot.com/2010/04/arduino-ibutton-data-logger-programmer.html
+  * Thermocron (IButton: https://be.farnell.com/fr-BE/c/semiconducteurs-circuits-integres/memoires/accessoires-iboutons/iboutons ) can receive a "mission" and record temperature OFF-LINE for very long period of time: they can be used to ensure cold-chain continuity during transportation. They can even be programmed by a remote radio module: http://arduinofun.blogspot.com/2010/04/arduino-ibutton-data-logger-programmer.html . We have programmed data download and missioning of Thermocron by ELSA
   * Mains Switch: https://www.axiris.eu/en/index.php/1-wire/1-wire-mains-switch
 * I2C sensors are often working at 3.3V and 5V. Short wires though (20 cm max: should be in the same box than the radio module)
   * I2C CO2+temperature+humidity: https://befr.rs-online.com/web/p/products/1720552/?grossPrice=Y&cm_mmc=BE-PLA-DS3A-_-google-_-PLA_BE_NL_Semiconductors-_-Sensor_Ics|Temperature_And_Humidity_Sensors-_-PRODUCT_GROUP&matchtype=&pla-544508151584&gclid=Cj0KCQiAzKnjBRDPARIsAKxfTRA_NGOGs_dE9fBuCA61ZyCIf1GovlkXcqFPyUBE3JYgCDP7rXKEHxUaAuaREALw_wcB&gclsrc=aw.ds
@@ -23,9 +24,9 @@ General design considerations:
   1. White - SDA (Blue for QWIIC)
   1. Red - VCC on all Grove Connectors
   1. Black - GND on all Grove Connectors
+  M5Stack Core is equipped with a Grove I2C connector.
 * Lithium Battery: https://shop.mchobby.be/accu-et-regulateur/746-accu-lipo-37v-4400mah-3232100007468.html , https://be.farnell.com/fr-BE/mikroelektronika/mikroe-1120/batterie-lithium-polymer-3-7v/dp/2786900 , https://www.onlylipo.com/21-1s-37-volts-1-element
 * Enclosures:
-  * Central "data sink" connected by Ethernet (RJ45) to the Internet router: https://www.thingiverse.com/thing:3149509
   * We selected KRADEX 64mm x 88mm x 42mm: https://www.tme.eu/fr/details/z-56jh-abs/boitiers-universels/kradex/z56jh-abs/ looking like CEL-MAR 1-Wire boxes that we also use.
   * 8 x 8cm, 5cm deep: many electrical junction boxes
   * 10 x 10cm, 6cm deep: http://be.farnell.com/fr-BE/fibox/pcm-95-60-g/coffret-boite-polycarbonate-gris/dp/2473443
@@ -33,7 +34,6 @@ General design considerations:
 ## Software
 * RadioHead libraries: http://www.airspayce.com/mikem/arduino/RadioHead/index.html Be sure to use the latest version (1.89)
   * for LoRa: http://www.airspayce.com/mikem/arduino/RadioHead/classRH__RF95.html
-  * For Adafruit Feather M0 with RFM95, construct the driver like this: RH_RF95 rf95(8, 3);
 
 * 1-wire:
   * Host driver: https://www.maximintegrated.com/en/products/ibutton/software/1wire/wirekit.cfm
@@ -41,7 +41,7 @@ General design considerations:
   * Slave device emulation library: https://github.com/orgua/OneWireHub (in case we want to connect to host through 1-wire)
 
 * AdaFruit Feather M0, Arduino IDE SAMD support: https://learn.adafruit.com/adafruit-feather-m0-basic-proto/using-with-arduino-ide
-  * UECIDE would be prefered if SAMD suppport / AdaFruit Feather M0 was supported (not really, too bad)
+
 ## LoRa
 * Allowed duty cycle and power in different 868MHz bands: https://www.disk91.com/2017/technology/internet-of-things-technology/all-what-you-need-to-know-about-regulation-on-rf-868mhz-for-lpwan/ From this document, the best local bandwidth could be 869,3 to 869,4 limited to 10mW but with no duty cycle constraint.
   * We measured 7 packets of 37 characters per seconds when testing this radio band.  
