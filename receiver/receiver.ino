@@ -297,8 +297,26 @@ void handleRoot() {
     return;
   }
   String s = "<!DOCTYPE html><html lang=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, user-scalable=no\"/>";
-  s += "<title>IotWebConf 03 Custom Parameters</title></head><body>Hello world!<br />";
-  s += "Go to <a href='config'>configure page</a> to change values.";
+  s += "<title>IotWebConf 03 Custom Parameters</title>";
+  s += "<style>.de{background-color:#ffaaaa;} .em{font-size:0.8em;color:#bb0000;padding-bottom:0px;} .c{text-align: center;} div,input{padding:5px;font-size:1em;} input{width:95%;} body{text-align: center;font-family:verdana;} button{border:0;border-radius:0.3rem;background-color:#16A1E7;color:#fff;line-height:2.4rem;font-size:1.2rem;width:100%;} fieldset{border-radius:0.3rem;margin: 0px;}</style>";
+  s += "<script>function c(l){document.getElementById('s').value=l.innerText||l.textContent;document.getElementById('p').focus();}";
+  s += "</script></head><body>";
+  s += "Welcome on the Akuino configuration home page.<br /><br />";
+  s += "Go to <a href='config'>configure page</a> to change values.<br /><br />";
+  s += "Current values : <br /><br />";
+  s += "<div style='text-align:left;display:inline-block;min-width:260px;'>";
+  s += "<form action='' method='post'><fieldset><input type='hidden' name='iotSave' height=100 value='true'>";
+  s += "<div class='class'><label>Thing Name</label><br /><input value=";
+  s += iotWebConf.getThingName();
+  s += "></div>";
+  s += "<div class='class'><label>WiFi SSID</label><br /><input value=";
+  s += iotWebConf.getWifiSsid();
+  s += "></div>";
+  s += "<div class='class'><label>Host</label><br /><input value=";
+  s += iotWebConf.getHostName();
+  s += "></div>";
+  s += "</fieldset></form>";
+  s += "</div>";
   s += "</body></html>\n";
 
   server.send(200, "text/html", s);
@@ -585,6 +603,10 @@ extern int receiving(struct pt *pt) {
       buf[len] = '\0';
       int sz = JBCDIC::decode_from_jbcdic(buf, len, buf2, SIZE_URL_HTTPS);
       buf2[sz] = '\0';
+      if(Serial) {
+        Serial.print(millis());
+        Serial.print(";I;");
+      }
       RH_RF95::printBuffer("Données recues [HEXA]: ", (uint8_t *)buf2, sz);
       if(Serial) {
         Serial.print(millis());
@@ -600,7 +622,7 @@ extern int receiving(struct pt *pt) {
 
       if(Serial) {
         Serial.print(millis());
-        Serial.println(";D;Date/RTC Time : ");
+        Serial.print(";D;Date/RTC Time : ");
         Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
         Serial.print(' ');
         Serial.print(now.day(), DEC);
@@ -615,7 +637,6 @@ extern int receiving(struct pt *pt) {
         Serial.print(':');
         Serial.print(now.second(), DEC);
         Serial.println();
-        Serial.print(millis());
       }
       
 //      if(rhRDatagram.sendtoWait((uint8_t *)buf2, sz, from)) {
@@ -704,9 +725,9 @@ extern int sendData(struct pt *pt) {
   }
   else{
     if(Serial) {
-    Serial.print(millis());
-    Serial.print(";D;Requesting URL: ");
-    Serial.println(URL_HTTPS);
+      Serial.print(millis());
+      Serial.print(";D;Requesting URL: ");
+      Serial.println(URL_HTTPS);
     }
 
     // This will send the request to the server
@@ -739,10 +760,8 @@ extern int sendData(struct pt *pt) {
     // Read all the lines of the reply from server and print them to Serial
     while(client.available()) {
       String line = client.readStringUntil('\r');
-      if(Serial) {
-        Serial.print(line);
-      }
-    }  
+      if(Serial) {Serial.print(line);}
+    }
   }
   PT_END(pt);
 }
